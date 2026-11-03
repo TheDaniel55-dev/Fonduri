@@ -1,6 +1,6 @@
 /* Fonduri — păstrează aplicația pe telefon ca să meargă fără internet.
    Când schimbi ceva în aplicație, crește numărul versiunii de mai jos. */
-const VERSION = 'fonduri-v1.4.0';
+const VERSION = 'fonduri-v1.5.0';
 const SHELL = [
   './', 'index.html', 'styles.css', 'core.js', 'app.js', 'manifest.webmanifest', 'vendor/xlsx.mini.min.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
