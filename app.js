@@ -534,7 +534,7 @@
       (list.length ? '<div class="card tight">' + list.map((e) => '<button class="list-row" data-a="sheet" data-s="earnFix" data-id="' + e.id + '"><span class="badge" style="background:color-mix(in srgb,var(--act) 22%,transparent);color:var(--actTxt)">' + esc(e.coin.slice(0, 4)) + '</span>' +
         '<span class="grow"><span class="t">' + qty(+e.qtyNow.toFixed(8)) + ' ' + esc(e.coin) + '</span><span class="s">' + (e.type === 'locked' ? 'Locked' + (e.daysLeft != null ? ', mai sunt ' + e.daysLeft + ' zile' : '') : 'Flexible') + ', APR ' + fmt(e.apr * 100, 2) + '%</span>' +
         '<span class="s m">' + (e.valueUsd != null ? usd(e.valueUsd) + ' ≈ ' + lei(Math.round(e.valueLei)) : 'fără preț acum') + '</span></span>' +
-        '<span class="col" style="align-items:flex-end;gap:2px"><span class="v green m">+' + qty(+e.estReward.toFixed(8)) + '</span><span class="tiny muted m">' + (e.rewardUsd != null ? '≈ ' + usd(e.rewardUsd) + ', ' : '') + e.days + ' zile</span></span></button>').join('') + '</div>'
+        '<span class="col" style="align-items:flex-end;gap:2px"><span class="v green m">+' + qty(+e.estReward.toFixed(8)) + '</span><span class="tiny muted m">azi +' + qty(+e.todayQty.toFixed(6)) + '</span><span class="tiny muted m">' + (e.rewardUsd != null ? '≈ ' + usd(e.rewardUsd) + ', ' : '') + e.days + ' zile</span></span></button>').join('') + '</div>'
         : '<div class="card empty">Nimic în Earn încă.</div>');
   }
   function savingsBody() {
