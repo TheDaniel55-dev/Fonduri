@@ -524,34 +524,45 @@
   function kv(k, v) { return '<div class="kv"><span>' + k + '</span><span class="m">' + v + '</span></div>'; }
   function earnBody() {
     const list = FC.earnSummary(S);
-    const totUsd = list.reduce((x, e) => x + (e.valueUsd || 0), 0), totLei = list.reduce((x, e) => x + (e.valueLei || 0), 0);
-    const yearUsd = list.reduce((x, e) => x + (e.yearUsd || 0), 0), rewUsd = list.reduce((x, e) => x + (e.rewardUsd || 0), 0);
-    return '<section class="card col" style="gap:12px;border-radius:28px;padding:20px"><span class="small muted">Valoare în Earn</span><span class="big m" style="font-size:40px">' + usd(totUsd) + '</span><span class="small soft m">≈ ' + lei(Math.round(totLei)) + '</span>' +
-      '<div class="grid2"><div class="col" style="background:var(--bg);border-radius:16px;padding:10px 12px;gap:2px"><span class="tiny muted">Câștigat până acum (estimat)</span><span class="m green" style="font-size:17px;font-weight:600">+' + usd(rewUsd) + '</span></div>' +
-      '<div class="col" style="background:var(--bg);border-radius:16px;padding:10px 12px;gap:2px"><span class="tiny muted">Într-un an, la APR-ul de acum</span><span class="m green" style="font-size:17px;font-weight:600">+' + usd(yearUsd) + '</span></div></div>' +
-      '<div class="grid2"><button class="btn primary" data-a="sheet" data-s="earnAdd">Pun în Earn</button><button class="btn" data-a="sheet" data-s="reward">Recompensă primită</button></div>' +
-      '<span class="tiny muted" style="line-height:1.5">Estimarea crește zilnic după APR. Când primești recompensa reală, o adaugi și intră în portofoliu.</span></section>' +
-      (list.length ? '<div class="card tight">' + list.map((e) => '<div class="list-row"><span class="badge" style="background:color-mix(in srgb,var(--act) 22%,transparent);color:var(--actTxt)">' + esc(e.coin.slice(0, 4)) + '</span>' +
-        '<span class="grow"><span class="t">' + qty(e.qty) + ' ' + esc(e.coin) + '</span><span class="s">' + (e.type === 'locked' ? 'Locked' + (e.daysLeft != null ? ', mai sunt ' + e.daysLeft + ' zile' : '') : 'Flexible') + ', APR ' + fmt(e.apr * 100, 2) + '%</span>' +
+    const sum = (k) => list.reduce((x, e) => x + (e[k] || 0), 0);
+    const totUsd = sum('valueUsd'), totLei = sum('valueLei'), yearUsd = sum('yearUsd'), rewUsd = sum('rewardUsd'), todayUsd = sum('todayUsd');
+    const tile = (label, val, sub) => '<div class="col" style="background:var(--bg);border-radius:16px;padding:10px 12px;gap:2px"><span class="tiny muted">' + label + '</span><span class="m green" style="font-size:17px;font-weight:600">' + val + '</span>' + (sub ? '<span class="tiny soft m">' + sub + '</span>' : '') + '</div>';
+    return '<section class="card col" style="gap:12px;border-radius:28px;padding:20px"><span class="small muted">Valoare în Earn, cu recompensele</span><span class="big m" style="font-size:40px">' + usd(totUsd) + '</span><span class="small soft m">≈ ' + lei(Math.round(totLei)) + '</span>' +
+      '<div class="grid2">' + tile('Câștigat până acum', '+' + usd(rewUsd), '≈ ' + lei(rewUsd * (S.fx.usdRon || 4.8), 2)) + tile('Primești azi', '+' + usd(todayUsd), 'într-un an ≈ +' + usd(yearUsd)) + '</div>' +
+      '<div class="grid2"><button class="btn primary" data-a="sheet" data-s="earnAdd">Pun în Earn</button><button class="btn" data-a="sheet" data-s="reward">Altă recompensă</button></div>' +
+      '<span class="tiny muted" style="line-height:1.5">Recompensa vine în fiecare zi. La Flexible se adaugă singură la suma din Earn și produce și ea, iar valoarea intră automat în totalul investițiilor. Dacă suma din ' + esc(EXCH()) + ' e alta, apasă pe poziție și scrie cifra reală.</span></section>' +
+      (list.length ? '<div class="card tight">' + list.map((e) => '<button class="list-row" data-a="sheet" data-s="earnFix" data-id="' + e.id + '"><span class="badge" style="background:color-mix(in srgb,var(--act) 22%,transparent);color:var(--actTxt)">' + esc(e.coin.slice(0, 4)) + '</span>' +
+        '<span class="grow"><span class="t">' + qty(+e.qtyNow.toFixed(8)) + ' ' + esc(e.coin) + '</span><span class="s">' + (e.type === 'locked' ? 'Locked' + (e.daysLeft != null ? ', mai sunt ' + e.daysLeft + ' zile' : '') : 'Flexible') + ', APR ' + fmt(e.apr * 100, 2) + '%, azi +' + qty(+e.todayQty.toFixed(8)) + '</span>' +
         '<span class="s m">' + (e.valueUsd != null ? usd(e.valueUsd) + ' ≈ ' + lei(Math.round(e.valueLei)) : 'fără preț acum') + '</span></span>' +
-        '<span class="col" style="align-items:flex-end;gap:2px"><span class="v green m">+' + qty(+e.estReward.toFixed(8)) + '</span><span class="tiny muted m">' + (e.rewardUsd != null ? '≈ ' + usd(e.rewardUsd) + ', ' : '') + e.days + ' zile</span></span>' +
-        '<button class="icon-btn" data-a="earnStop" data-id="' + e.id + '" aria-label="Am scos din Earn" style="width:36px;height:36px">' + ic('close', 16) + '</button></div>').join('') + '</div>'
+        '<span class="col" style="align-items:flex-end;gap:2px"><span class="v green m">+' + qty(+e.estReward.toFixed(8)) + '</span><span class="tiny muted m">' + (e.rewardUsd != null ? '≈ ' + usd(e.rewardUsd) + ', ' : '') + e.days + ' zile</span></span></button>').join('') + '</div>'
         : '<div class="card empty">Nimic în Earn încă.</div>');
   }
   function savingsBody() {
     const s = S.settings.savings, bal = FC.savingsBalance(S);
-    const monthly = bal * s.apr / 12 * (1 - s.tax);
     const proj = (yrs) => bal * Math.pow(1 + s.apr * (1 - s.tax) / 12, yrs * 12);
+    const nx = FC.savingsNext(S);
+    const nd = new Date(nx.date);
+    const ints = S.savings.filter((e) => e.kind === 'interest');
+    const yearAgo = FC.localISO(new Date(Date.now() - 365 * 864e5));
+    const last12 = ints.filter((e) => e.date >= yearAgo).reduce((x, e) => x + e.amount, 0);
+    const pendingEst = ints.filter((e) => e.est).length;
     const ev = S.savings.slice().sort(FC.byDate).reverse().slice(0, 30);
+    const label = (e) => e.kind === 'interest' ? 'Dobândă ' + (e.forYM ? MONTHS[+e.forYM.slice(5) - 1] : '') : { deposit: 'Depunere', withdraw: 'Retragere', set: 'Sold corectat' }[e.kind];
     return '<section class="card col" style="gap:12px;border-radius:28px;padding:20px"><span class="small muted">' + esc(s.name) + '</span><span class="big m" style="font-size:42px">' + fmt(bal, 2) + '<span style="font-size:20px;color:var(--muted)"> lei</span></span>' +
-      '<span class="small soft">Dobândă ' + fmt(s.apr * 100, 2) + '% pe an, impozit ' + Math.round(s.tax * 100) + '% reținut de bancă</span>' +
-      '<div class="grid3"><div class="col"><span class="tiny muted">Pe lună, net</span><span class="m green" style="font-weight:600">+' + fmt(monthly, 2) + '</span></div><div class="col"><span class="tiny muted">Peste 1 an</span><span class="m" style="font-weight:600">' + fmt(Math.round(proj(1))) + '</span></div><div class="col"><span class="tiny muted">Peste 5 ani</span><span class="m" style="font-weight:600">' + fmt(Math.round(proj(5))) + '</span></div></div>' +
+      '<span class="small soft" style="line-height:1.5">Dobândă ' + fmt(s.apr * 100, 2) + '% pe an, primită lunar pe ' + (s.payDay || 1) + ', cu impozitul de ' + Math.round(s.tax * 100) + '% deja reținut de bancă.</span>' +
+      '<div class="col" style="background:var(--bg);border-radius:16px;padding:12px 14px;gap:4px"><span class="tiny muted">Următoarea dobândă, pentru ' + MONTHS[+nx.forYM.slice(5) - 1] + '</span>' +
+      '<span class="row between"><span class="m green" style="font-size:20px;font-weight:600">≈ +' + fmt(nx.net, 2) + ' lei</span><span class="small soft">pe ' + nd.getDate() + ' ' + MONTHS[nd.getMonth()] + '</span></span>' +
+      '<span class="tiny muted m">brut ' + fmt(nx.gross, 2) + ' lei, impozit ' + fmt(nx.gross - nx.net, 2) + ' lei</span></div>' +
+      '<div class="grid3"><div class="col"><span class="tiny muted">Primit în 12 luni</span><span class="m green" style="font-weight:600">+' + fmt(last12, 2) + '</span></div><div class="col"><span class="tiny muted">Peste 1 an</span><span class="m" style="font-weight:600">' + fmt(Math.round(proj(1))) + '</span></div><div class="col"><span class="tiny muted">Peste 5 ani</span><span class="m" style="font-weight:600">' + fmt(Math.round(proj(5))) + '</span></div></div>' +
       '<div class="grid3"><button class="btn primary" data-a="sheet" data-s="savDep">Depun</button><button class="btn" data-a="sheet" data-s="savWd">Retrag</button><button class="btn" data-a="sheet" data-s="savSet">Corectez</button></div>' +
-      '<span class="tiny muted">Proiecția nu include depunerile viitoare. Dobânda se adaugă automat pe 1 ale lunii, estimată; dacă banca dă altă cifră, apasă Corectez.</span></section>' +
-      (ev.length ? '<div class="card tight">' + ev.map((e) => '<div class="list-row"><span class="badge" style="background:rgba(75,156,211,.16);color:#6FB3E2">' + ic(e.kind === 'interest' ? 'plus' : e.kind === 'withdraw' ? 'out' : e.kind === 'set' ? 'funds' : 'inc', 18) + '</span>' +
-        '<span class="grow"><span class="t">' + { deposit: 'Depunere', withdraw: 'Retragere', interest: 'Dobândă', set: 'Sold corectat' }[e.kind] + '</span><span class="s">' + dayLabel(e.date) + (e.note ? ', ' + esc(e.note) : '') + '</span></span>' +
-        '<span class="v m ' + (e.kind === 'withdraw' ? '' : 'green') + '">' + (e.kind === 'withdraw' ? '−' : e.kind === 'set' ? '' : '+') + fmt(e.amount, 2) + '</span>' +
-        (e.kind !== 'interest' ? '<button class="icon-btn" data-a="savDel" data-id="' + e.id + '" aria-label="Șterge" style="width:36px;height:36px">' + ic('trash', 16) + '</button>' : '') + '</div>').join('') + '</div>'
+      '<span class="tiny muted" style="line-height:1.5">Dobânda se calculează pe soldul din fiecare zi și apare singură în ziua plății, ca estimare.' + (pendingEst ? ' Când vezi suma reală în aplicația băncii, apasă pe ea în listă și scrie cifra.' : '') + ' Proiecția nu include depunerile viitoare.</span></section>' +
+      (ev.length ? '<div class="card tight">' + ev.map((e) => {
+        const isInt = e.kind === 'interest';
+        return '<div class="list-row"' + (isInt ? ' data-a="sheet" data-s="savInt" data-id="' + e.id + '" role="button" tabindex="0" style="cursor:pointer"' : '') + '><span class="badge" style="background:rgba(75,156,211,.16);color:#6FB3E2">' + ic(isInt ? 'plus' : e.kind === 'withdraw' ? 'out' : e.kind === 'set' ? 'funds' : 'inc', 18) + '</span>' +
+          '<span class="grow"><span class="t">' + label(e) + '</span><span class="s">' + dayLabel(e.date) + (isInt ? (e.est ? ', <span style="color:var(--amber)">estimată, apasă ca să pui suma reală</span>' : ', primită') : e.note ? ', ' + esc(e.note) : '') + '</span></span>' +
+          '<span class="v m ' + (e.kind === 'withdraw' ? '' : 'green') + '">' + (e.kind === 'withdraw' ? '−' : e.kind === 'set' ? '' : '+') + fmt(e.amount, 2) + '</span>' +
+          (!isInt ? '<button class="icon-btn" data-a="savDel" data-id="' + e.id + '" aria-label="Șterge" style="width:36px;height:36px">' + ic('trash', 16) + '</button>' : '') + '</div>';
+      }).join('') + '</div>'
         : '<div class="card empty">Pune soldul actual cu „Corectez”, apoi adaugă depunerile pe măsură ce le faci.</div>');
   }
 
@@ -690,7 +701,9 @@
       '<label class="switch"><span>Plătesc fee-ul cu BNB</span><input type="checkbox" ' + (s.binance.payFeeInBnb ? 'checked' : '') + ' data-a2="binBnb"></label>';
 
     const savBody = lbl('Nume cont', '<input class="input" value="' + esc(s.savings.name) + '" data-a2="sav" data-k="name">') +
-      '<div class="grid2">' + lbl('Dobândă pe an (%)', '<input class="input" inputmode="decimal" value="' + pct(s.savings.apr) + '" data-a2="sav" data-k="apr">') + lbl('Impozit (%)', '<input class="input" inputmode="decimal" value="' + pct(s.savings.tax) + '" data-a2="sav" data-k="tax">') + '</div>';
+      '<div class="grid2">' + lbl('Dobândă pe an (%)', '<input class="input" inputmode="decimal" value="' + pct(s.savings.apr) + '" data-a2="sav" data-k="apr">') + lbl('Impozit (%)', '<input class="input" inputmode="decimal" value="' + pct(s.savings.tax) + '" data-a2="sav" data-k="tax">') + '</div>' +
+      lbl('Ziua din lună în care primești dobânda', '<input class="input" inputmode="numeric" value="' + (s.savings.payDay || 1) + '" data-a2="payDay">') +
+      '<span class="small muted" style="line-height:1.5">Dobânda e anuală, dar banca o plătește lunar, calculată pe soldul din fiecare zi, cu impozitul deja reținut. Aplicația o adaugă singură, ca estimare, în ziua plății.</span>';
 
     const recBody = (S.recurring.length ? S.recurring.map((r) => '<button class="list-row" data-a="sheet" data-s="recEdit" data-id="' + r.id + '" style="padding:6px 0"><span class="badge" style="background:rgba(255,105,97,.15);color:var(--red)">' + ic('repeat', 18) + '</span><span class="grow"><span class="t">' + esc(r.note || r.cat) + '</span><span class="s">în fiecare lună pe ' + r.day + (r.active ? '' : ', oprită') + '</span></span><span class="v m">' + fmt(r.amount, 2) + '</span></button>').join('') : '<span class="small muted">Nicio plată recurentă.</span>') +
       '<button class="btn block" data-a="sheet" data-s="recEdit">' + ic('plus', 18, 2) + 'Adaugă plată recurentă</button>';
@@ -748,7 +761,7 @@
       grp('month', 'Luna financiară', (s.monthStart || 1) === 1 ? 'de pe 1 până la sfârșitul lunii' : 'începe pe ' + s.monthStart, monthBody) +
       grp('priv', 'Confidențialitate', 'Face ID, mod discret', privBody) +
       grp('data', 'Date', 'export, import', dataBody) +
-      '<p class="tiny muted" style="text-align:center">Fonduri 1.3</p></main>';
+      '<p class="tiny muted" style="text-align:center">Fonduri 1.4</p></main>';
   }
   function fundEditor(f) {
     return '<div class="col" style="gap:12px;background:var(--bg);border-radius:18px;padding:14px;margin-bottom:8px">' +
@@ -865,14 +878,28 @@
     }
     if (s === 'withdraw') return formSheet('Retragere în lei', '<div class="grid2">' + field('Dolari scoși ($)', 'usd', '', 'inputmode="decimal" required') + field('Lei intrați în ' + esc(BANK()), 'lei', '', 'inputmode="decimal" required') + '</div>' +
       '<div class="field"><label for="f_fund">În fondul</label><select id="f_fund" class="input" name="fund">' + FUNDS().map((f) => '<option ' + (f === S.settings.binance.cryptoFund ? 'selected' : '') + '>' + f + '</option>').join('') + '</select></div>' + dateField(), 'Salvează retragerea', 'withdraw');
-    if (s === 'reward') return formSheet('Recompensă Earn', '<div class="grid2">' + field('Moneda', 'coin', '', 'autocapitalize="characters" required') + field('Cantitate primită', 'qty', '', 'inputmode="decimal" required') + '</div>' + dateField(), 'Adaugă', 'reward');
+    if (s === 'earnFix') {
+      const e = FC.earnSummary(S).find((x) => x.id === A.id); if (!e) return '';
+      return formSheet(e.coin + ' în Earn', '<div class="card col" style="gap:6px">' + kv('Pus inițial / la ultima corectură', qty(e.qty)) + kv('Estimat acum', qty(+e.qtyNow.toFixed(8))) + kv('Recompense de la ' + e.start.split('-').reverse().join('.'), '+' + qty(+e.estReward.toFixed(8))) + '</div>' +
+        field('Cât ai acum în Earn (din aplicația ' + esc(EXCH()) + ')', 'qty', '', 'inputmode="decimal" required placeholder="' + (+e.qtyNow.toFixed(8)) + '"') +
+        '<span class="small muted" style="line-height:1.5">Diferența față de ce ai pus se salvează ca recompensă primită, iar estimarea zilnică pornește din nou de azi.</span>' +
+        '<input type="hidden" name="id" value="' + esc(e.id) + '">' +
+        '<button type="button" class="btn danger block" data-a="earnStop" data-id="' + e.id + '">Am scos tot din Earn</button>', 'Salvează suma reală', 'earnFix');
+    }
+    if (s === 'reward') return formSheet('Altă recompensă (airdrop, Launchpool)', '<div class="grid2">' + field('Moneda', 'coin', '', 'autocapitalize="characters" required') + field('Cantitate primită', 'qty', '', 'inputmode="decimal" required') + '</div>' + dateField(), 'Adaugă', 'reward');
     if (s === 'earnAdd') return formSheet('Pun în Earn', '<div class="grid2">' + field('Moneda', 'coin', '', 'autocapitalize="characters" required') + field('Cantitate', 'qty', '', 'inputmode="decimal" required') + '</div>' +
       '<div class="field"><label for="f_type">Tip</label><select id="f_type" class="input" name="type"><option value="flexible">Flexible</option><option value="locked">Locked</option></select></div>' +
       '<div class="grid2">' + field('APR (%)', 'apr', '', 'inputmode="decimal" required') + field('Până la (doar Locked)', 'end', '', 'type="date"') + '</div>' + field('Din data', 'start', FC.localISO().slice(0, 10), 'type="date"'), 'Salvează', 'earnAdd');
     if (s === 'savDep') return formSheet('Depun în economii', field('Sumă (lei)', 'amount', '', 'inputmode="decimal" required') + dateField() + '<span class="small muted">Banii pleacă din fondul ' + S.settings.savings.fund + '.</span>', 'Depun', 'savDep');
     if (s === 'savWd') return formSheet('Retrag din economii', field('Sumă (lei)', 'amount', '', 'inputmode="decimal" required') +
       '<div class="field"><label for="f_fund">În fondul</label><select id="f_fund" class="input" name="fund">' + FUNDS().map((f) => '<option ' + (f === S.settings.savings.fund ? 'selected' : '') + '>' + f + '</option>').join('') + '</select></div>' + dateField(), 'Retrag', 'savWd');
-    if (s === 'savSet') return formSheet('Soldul real din cont', field('Sold acum (lei)', 'amount', FC.savingsBalance(S) || '', 'inputmode="decimal" required') + '<span class="small muted" style="line-height:1.5">Pui cifra din aplicația BT. Nu mută bani din fonduri, doar corectează soldul (de exemplu dobânda reală).</span>', 'Salvează', 'savSet');
+    if (s === 'savInt') {
+      const e = S.savings.find((x) => x.id === A.id); if (!e) return '';
+      return formSheet('Dobânda pentru ' + (e.forYM ? MONTHS[+e.forYM.slice(5) - 1] : 'luna trecută'), '<span class="small soft" style="line-height:1.5">' + (e.est ? 'Am estimat ' + lei(e.amount, 2) + ' net. ' : '') + 'Scrie suma netă care a intrat în cont (după impozit), din aplicația băncii.</span>' +
+        field('Dobândă primită (lei, net)', 'amount', e.est ? '' : e.amount, 'inputmode="decimal" required placeholder="' + fmt(e.amount, 2) + '"') +
+        '<input type="hidden" name="id" value="' + esc(e.id) + '">', 'Salvează', 'savInt');
+    }
+    if (s === 'savSet') return formSheet('Soldul real din cont', field('Sold acum (lei)', 'amount', FC.savingsBalance(S) || '', 'inputmode="decimal" required') + '<span class="small muted" style="line-height:1.5">Pui cifra din aplicația băncii. Nu mută bani din fonduri, doar corectează soldul.</span>', 'Salvează', 'savSet');
     if (s === 'cashAdd') return formSheet('Pușculița', '<div class="field"><label for="f_d">Ce pui</label><select id="f_d" class="input" name="denom">' + S.settings.denoms.map((d) => '<option value="' + d.id + '">' + d.label + '</option>').join('') + '</select></div>' +
       '<div class="grid2">' + field('Câte (sau câți €)', 'count', '', 'inputmode="decimal" required') + '<div class="field"><label for="f_dir">Operație</label><select id="f_dir" class="input" name="dir"><option value="1">Pun deoparte</option><option value="-1">Scot</option></select></div></div>' +
       '<span class="small muted" style="line-height:1.5">Nu schimbă soldul fondurilor. Aplicația împarte singură cash-ul: întâi ' + S.settings.cashOrder.join(', apoi ') + '.</span>', 'Salvează', 'cashAdd');
@@ -1024,7 +1051,7 @@
       FC.addCash(S, d.d, n); commit((n > 0 ? '+1 ' : '−1 ') + item.label);
       render();
     }),
-    earnStop: (d) => { const e = S.earn.find((x) => x.id === d.id); if (e) ask('Ai scos ' + e.coin + ' din Earn?', 'Da, l-am scos', () => { e.active = false; commit('Scos din Earn'); render(); }); },
+    earnStop: (d) => { const e = S.earn.find((x) => x.id === d.id); if (e) ask('Ai scos ' + e.coin + ' din Earn? Recompensele de până azi rămân în portofoliu.', 'Da, l-am scos', () => { FC.earnStop(S, d.id); closeSheet(); commit('Scos din Earn'); }); },
     savDel: (d) => ask('Ștergi operațiunea?', 'Șterge', () => { const tx = S.tx.find((t) => t.link === d.id); if (tx) FC.deleteTx(S, tx.id); else S.savings = S.savings.filter((e) => e.id !== d.id); commit('Șters'); render(); }),
     formSet: (d) => { UI.form[d.k] = d.v; render(); },
     catDel: (d) => ask('Ștergi categoria „' + d.c + '”? Tranzacțiile vechi o păstrează.', 'Șterge', () => { S.settings.categories = S.settings.categories.filter((c) => c !== d.c); commit(); render(); }),
@@ -1065,6 +1092,7 @@
       closeSheet(); commit(side === 'buy' ? 'Cumpărare salvată' : 'Vânzare salvată'); refreshMarket(false).then(startLive);
     },
     withdraw: (f) => { FC.cryptoWithdraw(S, { usd: num(f.usd), lei: num(f.lei), fund: f.fund.value, date: f.date.value }); closeSheet(); commit('Retragere salvată'); },
+    earnFix: (f) => { const d = FC.earnFix(S, f.id.value, num(f.qty)); closeSheet(); commit(d >= 0 ? 'Salvat: +' + qty(+d.toFixed(8)) + ' recompensă' : 'Salvat'); },
     reward: (f) => { FC.cryptoReward(S, { coin: f.coin.value, qty: num(f.qty), date: f.date.value }); closeSheet(); commit('Recompensă adăugată'); },
     earnAdd: (f) => {
       const apr = num(f.apr) / 100;
@@ -1074,6 +1102,7 @@
     },
     savDep: (f) => { FC.savingsDeposit(S, num(f.amount), f.date.value); closeSheet(); commit('Depus în economii'); },
     savWd: (f) => { FC.savingsWithdraw(S, num(f.amount), f.fund.value, f.date.value); closeSheet(); commit('Retras din economii'); },
+    savInt: (f) => { FC.setInterestReal(S, f.id.value, num(f.amount)); closeSheet(); commit('Dobândă salvată'); },
     savSet: (f) => { const v = num(f.amount); if (!(v >= 0)) throw new Error('Scrie soldul.'); S.savings.push({ id: FC.uid(), kind: 'set', date: FC.localISO(), amount: FC.r2(v), note: 'din aplicația băncii' }); closeSheet(); commit('Sold actualizat'); },
     cashAdd: (f) => {
       const n = num(f.count) * (+f.dir.value);
@@ -1118,6 +1147,7 @@
     else if (k === 'recentCount') { if (v >= 1 && v <= 30) s.home.recentCount = Math.round(v); }
     else if (k === 'lockAfterMin') { if (v >= 0) s.lockAfterMin = v; }
     else if (k === 'exportRemindDays') { if (v >= 1) s.exportRemindDays = Math.round(v); }
+    else if (k === 'payDay') { if (v >= 1 && v <= 31) s.savings.payDay = Math.round(v); else return false; }
     else if (k === 'monthStart') { if (v >= 1 && v <= 28) { s.monthStart = Math.round(v); UI.statsYM = curYM(); } else return false; }
     else return false;
     save(); return true;

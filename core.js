@@ -30,7 +30,7 @@
       eurRate: 5,                  // 1 € = 5 lei (regula ta)
       cashOrder: ['Rezervă', 'Achiziție', 'Investiții'],
       binance: { cardFee: 0.036, tradeFee: 0.001, bnbDiscount: 0.25, payFeeInBnb: true, cryptoFund: 'Investiții' },
-      savings: { name: 'Cont de economii', apr: 0.0275, tax: 0.10, fund: 'Investiții' },
+      savings: { name: 'Cont de economii', apr: 0.0275, tax: 0.10, fund: 'Investiții', payDay: 1 },
       lock: { enabled: false, credId: null },
       discreet: false,
       lastExport: null,
@@ -344,6 +344,13 @@
         const p = pos(e.coin); p.qty += e.qty; p.earnQty += e.qty;
       }
     });
+    // recompensele Earn care curg zilnic și n-au fost încă trecute ca sumă reală
+    const at = uptoISO ? new Date(uptoISO).getTime() : Date.now();
+    (state.earn || []).forEach((e) => {
+      if (e.active === false || !e.start || e.start > (uptoISO || '9999')) return;
+      const a = earnAccrued(e, at);
+      if (a.acc > 0) { const p = pos(e.coin); p.qty += a.acc; p.earnQty += a.acc; p.earnLive = (p.earnLive || 0) + a.acc; }
+    });
     Object.keys(coins).forEach((c) => { if (coins[c].qty < 1e-12) { coins[c].qty = 0; } });
     return { coins, stableUsd: Math.max(0, stableUsd), stableLei: Math.max(0, stableLei), depositedLei, withdrawnLei, realizedUsd, fees };
   }
@@ -377,23 +384,57 @@
   }
 
   /* ---------- Earn ---------- */
+  /* Recompensa Earn vine zilnic. Flexible cu auto-subscribe: se adaugă la suma din Earn și produce și ea
+     (dobândă la dobândă). Locked: tot zilnic, fără să se adune la suma care produce. */
+  function earnAccrued(e, atMs) {
+    const start = new Date(e.start).getTime();
+    let end = atMs;
+    if (e.end && e.type === 'locked') end = Math.min(end, new Date(e.end + 'T23:59').getTime());
+    if (e.active === false && e.stoppedAt) end = Math.min(end, new Date(e.stoppedAt).getTime());
+    const days = Math.max(0, Math.floor((end - start) / 864e5));   // recompensa vine o dată pe zi
+    const r = e.apr / 365;
+    const acc = e.type === 'locked' ? e.qty * r * days : e.qty * (Math.pow(1 + r, days) - 1);
+    return { days, acc };
+  }
   function earnSummary(state) {
     const now = Date.now();
     return state.earn.filter((e) => e.active !== false).map((e) => {
-      const start = new Date(e.start).getTime();
-      const days = Math.max(0, (now - start) / 864e5);
       const end = e.end ? new Date(e.end).getTime() : null;
       const pr = e.coin === 'USDT' || e.coin === 'USDC' ? 1 : (state.prices[e.coin] && state.prices[e.coin].p);
       const rate = state.fx.usdRon || 4.8;
-      const est = e.qty * e.apr * days / 365;
+      const a = earnAccrued(e, now);
+      const cur = e.qty + (e.type === 'locked' ? 0 : a.acc);         // ce produce acum
+      const total = e.qty + a.acc;                                     // ce ai acum în Earn, cu recompensele
+      const today = cur * e.apr / 365;
       return Object.assign({}, e, {
-        days: Math.floor(days), estReward: est,
+        days: a.days, estReward: a.acc, qtyNow: total, todayQty: today,
         daysLeft: end ? Math.max(0, Math.ceil((end - now) / 864e5)) : null,
-        price: pr || null, valueUsd: pr ? e.qty * pr : null, valueLei: pr ? e.qty * pr * rate : null,
-        rewardUsd: pr ? est * pr : null, rewardLei: pr ? est * pr * rate : null,
-        yearUsd: pr ? e.qty * pr * e.apr : null
+        price: pr || null, valueUsd: pr ? total * pr : null, valueLei: pr ? total * pr * rate : null,
+        rewardUsd: pr ? a.acc * pr : null, rewardLei: pr ? a.acc * pr * rate : null,
+        todayUsd: pr ? today * pr : null,
+        yearUsd: pr ? cur * pr * (e.type === 'locked' ? e.apr : Math.pow(1 + e.apr / 365, 365) - 1) : null
       });
     });
+  }
+  /* Pui cifra reală din aplicația exchange-ului: diferența devine recompensă înregistrată, iar estimarea pornește de azi. */
+  function earnFix(state, id, actualQty, date) {
+    const e = state.earn.find((x) => x.id === id);
+    actualQty = parseFloat(actualQty);
+    if (!e) throw new Error('Nu găsesc poziția.');
+    if (!(actualQty >= 0)) throw new Error('Scrie cantitatea.');
+    date = date || localISO();
+    const diff = actualQty - e.qty;
+    if (Math.abs(diff) > 1e-12) state.crypto.push({ id: uid(), kind: 'reward', date, coin: e.coin, qty: diff, note: 'Earn ' + (e.type === 'locked' ? 'Locked' : 'Flexible'), earnId: e.id });
+    e.qty = actualQty; e.start = date.slice(0, 10);
+    return diff;
+  }
+  function earnStop(state, id, date) {
+    const e = state.earn.find((x) => x.id === id);
+    if (!e) return;
+    date = date || localISO();
+    const a = earnAccrued(e, new Date(date).getTime());
+    if (a.acc > 1e-12) state.crypto.push({ id: uid(), kind: 'reward', date, coin: e.coin, qty: a.acc, note: 'Earn (la retragere)', earnId: e.id });
+    e.active = false; e.stoppedAt = date;
   }
 
   /* ---------- cont de economii ---------- */
@@ -422,33 +463,67 @@
     });
     return r2(b);
   }
-  /* Dobânda se capitalizează lunar: la deschidere adăugăm lunile trecute (net, după impozit). */
+  /* Dobânda: anuală ca procent, calculată pe soldul din fiecare zi și plătită lunar, cu impozitul deja reținut.
+     Dobânda pentru luna L intră în cont în ziua „payDay” din luna următoare (estimată; o corectezi cu suma reală). */
+  function savingsMonthInterest(state, ym) {
+    const s = state.settings.savings;
+    const [y, m] = ym.split('-').map(Number);
+    const dim = new Date(y, m, 0).getDate();
+    let sum = 0;
+    for (let d = 1; d <= dim; d++) sum += Math.max(0, savingsBalance(state, ym + '-' + pad(d) + 'T23:59'));
+    const gross = sum * s.apr / 365;
+    return { gross: r2(gross), net: r2(gross * (1 - s.tax)), tax: r2(gross * s.tax) };
+  }
+  function payDate(state, ym) {
+    const [y, m] = ym.split('-').map(Number);
+    const dim = new Date(y, m, 0).getDate();
+    return ym + '-' + pad(Math.min(dim, Math.max(1, state.settings.savings.payDay || 1))) + 'T09:00';
+  }
   function accrueSavings(state, now) {
     now = now || new Date();
-    const s = state.settings.savings;
     if (!state.savings.length) return 0;
+    const nowISO = localISO(now);
     const first = state.savings.slice().sort(byDate)[0];
-    let ym = monthOf(first.date);
-    const lastInt = state.savings.filter((e) => e.kind === 'interest').map((e) => e.ym).sort().pop();
-    if (lastInt && lastInt >= ym) ym = lastInt;
-    const curYM = now.getFullYear() + '-' + pad(now.getMonth() + 1);
+    let ym = monthOf(first.date);                         // luna pentru care se calculează dobânda
     let added = 0;
-    while (true) {
+    for (let guard = 0; guard < 600; guard++) {
       const [y, m] = ym.split('-').map(Number);
-      const next = new Date(y, m, 1);                    // prima zi a lunii următoare
-      const nextYM = next.getFullYear() + '-' + pad(next.getMonth() + 1);
-      if (nextYM > curYM) break;
-      if (!state.savings.some((e) => e.kind === 'interest' && e.ym === nextYM)) {
-        const bal = savingsBalance(state, nextYM + '-01T00:00');
-        const interest = r2(bal * s.apr / 12 * (1 - s.tax));
-        if (interest > 0) {
-          state.savings.push({ id: uid(), kind: 'interest', ym: nextYM, date: nextYM + '-01T00:01', amount: interest, note: 'Dobândă netă (estimată)' });
+      const nd = new Date(y, m, 1), nextYM = nd.getFullYear() + '-' + pad(nd.getMonth() + 1);
+      const when = payDate(state, nextYM);
+      if (when > nowISO) break;
+      if (!state.savings.some((e) => e.kind === 'interest' && (e.ym === nextYM || e.forYM === ym))) {
+        const it = savingsMonthInterest(state, ym);
+        if (it.net > 0) {
+          state.savings.push({ id: uid(), kind: 'interest', ym: nextYM, forYM: ym, date: when, amount: it.net, gross: it.gross, est: true, note: 'Dobândă netă (estimată)' });
           added++;
         }
       }
       ym = nextYM;
     }
     return added;
+  }
+  /* Suma reală primită de la bancă înlocuiește estimarea. */
+  function setInterestReal(state, id, amount) {
+    const e = state.savings.find((x) => x.id === id && x.kind === 'interest');
+    amount = r2(parseFloat(amount));
+    if (!e) throw new Error('Nu găsesc dobânda.');
+    if (!(amount >= 0)) throw new Error('Scrie suma primită.');
+    e.amount = amount; e.est = false; e.note = 'Dobândă netă primită';
+    return e;
+  }
+  /* Cât estimez că primești data viitoare: luna în curs, cu soldul de azi pentru zilele rămase. */
+  function savingsNext(state, now) {
+    now = now || new Date();
+    const ym = now.getFullYear() + '-' + pad(now.getMonth() + 1);
+    const nd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const it = savingsMonthInterest(state, ym);
+    const pendingPrev = payDate(state, ym) > localISO(now);   // dobânda lunii trecute încă n-a venit
+    const pd = new Date(now.getFullYear(), now.getMonth() - 1, 1), prevYM = pd.getFullYear() + '-' + pad(pd.getMonth() + 1);
+    if (pendingPrev && state.savings.length && monthOf(state.savings.slice().sort(byDate)[0].date) <= prevYM) {
+      const p = savingsMonthInterest(state, prevYM);
+      return { forYM: prevYM, date: payDate(state, ym), net: p.net, gross: p.gross };
+    }
+    return { forYM: ym, date: payDate(state, nd.getFullYear() + '-' + pad(nd.getMonth() + 1)), net: it.net, gross: it.gross };
   }
 
   /* ---------- recurente ---------- */
@@ -851,7 +926,7 @@
     earnSummary, savingsDeposit, savingsWithdraw, savingsBalance, accrueSavings,
     runRecurring, periodStats, monthRange, monthsBack, feeReport, isExpense,
     netWorth, snapshot, worthSeries, validateBackup, exportRows, kindLabel,
-    exName, setPet, setBank, finYM, availableFunds, fundSeries, savingsReport, investReport, coinsEver, portfolioSeries, goalProgress, paceCompare
+    exName, setPet, setBank, earnAccrued, earnFix, earnStop, savingsMonthInterest, setInterestReal, savingsNext, finYM, availableFunds, fundSeries, savingsReport, investReport, coinsEver, portfolioSeries, goalProgress, paceCompare
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = FC;
   else root.FC = FC;
