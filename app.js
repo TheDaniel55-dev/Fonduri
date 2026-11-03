@@ -936,8 +936,8 @@
     }
     if (s === 'cryptoFix') {
       const cv = FC.cryptoValue(S);
-      const row = (c) => '<div class="col" style="gap:6px;padding:10px 0;border-bottom:1px solid var(--line)"><span style="font-weight:600">' + esc(c.coin) + ' <span class="tiny muted" style="font-weight:400">acum ' + qty(c.qty) + ', medie ' + usd(c.avgUsd) + '</span></span>' +
-        '<div class="grid2"><input class="input" name="q_' + esc(c.coin) + '" inputmode="decimal" placeholder="Cantitate ' + (+c.qty.toFixed(8)) + '" aria-label="Cantitate ' + esc(c.coin) + '"><input class="input" name="p_' + esc(c.coin) + '" inputmode="decimal" placeholder="Preț mediu $' + (+c.avgUsd.toFixed(4)) + '" aria-label="Preț mediu ' + esc(c.coin) + '"></div></div>';
+      const row = (c) => '<div class="col" style="gap:6px;padding:10px 0;border-bottom:1px solid var(--line)"><span style="font-weight:600">' + esc(c.coin) + '</span>' +
+        '<div class="grid2"><label class="col" style="gap:4px"><span class="tiny muted">Cantitate</span><input class="input" name="q_' + esc(c.coin) + '" inputmode="decimal" placeholder="' + (+c.qty.toFixed(8)) + '"></label><label class="col" style="gap:4px"><span class="tiny muted">Preț mediu ($)</span><input class="input" name="p_' + esc(c.coin) + '" inputmode="decimal" placeholder="' + (+c.avgUsd.toFixed(4)) + '"></label></div></div>';
       return formSheet('Corectez crypto', '<span class="small soft" style="line-height:1.5">Completează doar ce nu se potrivește cu ' + esc(EXCH()) + '. Cantitatea e totalul, inclusiv ce ai în Earn. Prețul mediu e opțional.</span>' +
         cv.list.filter((c) => c.coin !== 'USDT' && c.coin !== 'USDC').map(row).join('') +
         '<h3>Monedă care lipsește</h3><div class="grid3"><input class="input" name="nc" autocapitalize="characters" placeholder="ex. DOT" aria-label="Monedă nouă"><input class="input" name="nq" inputmode="decimal" placeholder="Cantitate" aria-label="Cantitate"><input class="input" name="np" inputmode="decimal" placeholder="Preț mediu $" aria-label="Preț mediu"></div>' +
