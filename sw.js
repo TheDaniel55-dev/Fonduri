@@ -1,8 +1,8 @@
 /* Fonduri — păstrează aplicația pe telefon ca să meargă fără internet.
    Când schimbi ceva în aplicație, crește numărul versiunii de mai jos. */
-const VERSION = 'fonduri-v1.5.0';
+const VERSION = 'fonduri-v1.6.0';
 const SHELL = [
-  './', 'index.html', 'styles.css', 'core.js', 'app.js', 'manifest.webmanifest', 'vendor/xlsx.mini.min.js',
+  './', 'index.html', 'styles.css', 'core.js', 'app.js', 'city-sync.js', 'vendor/jsQR.js', 'manifest.webmanifest', 'vendor/xlsx.mini.min.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
   'fonts/bricolage-grotesque-latin-500-normal.woff2', 'fonts/bricolage-grotesque-latin-600-normal.woff2', 'fonts/bricolage-grotesque-latin-700-normal.woff2',
   'fonts/bricolage-grotesque-latin-ext-500-normal.woff2', 'fonts/bricolage-grotesque-latin-ext-600-normal.woff2', 'fonts/bricolage-grotesque-latin-ext-700-normal.woff2',
@@ -14,7 +14,7 @@ self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('fonduri-v') && k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);

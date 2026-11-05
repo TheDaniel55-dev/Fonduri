@@ -1,9 +1,9 @@
 # Fonduri
 
-Aplicație personală de bani: fonduri, cheltuieli, crypto (cu toate fee-urile), Earn, cont de economii și pușculița cu bancnote. Datele stau doar pe telefon; în acest depozit e doar codul.
+Aplicație personală de bani: fonduri, cheltuieli, crypto, Earn, cont de economii și pușculița cu bancnote. Telefonul este sursa datelor; în acest depozit e doar codul.
 
 - Merge offline, se instalează pe iPhone din Safari („Adaugă pe ecranul principal”).
-- **Datele nu stau aici.** Stau doar pe telefon. Repo-ul conține doar codul aplicației.
+- **Datele nu stau aici.** Sincronizarea opțională cu Orașul DSL trimite un instantaneu criptat doar după scanarea unui QR și aprobarea cu cheia de acces. PC-ul verifică aprobarea și păstrează local copia sincronizată.
 - Nu urca niciodată în repo fișierul de import sau backup-urile (`fonduri-import.json`, `fonduri-backup-*.json`).
 
 ## Fișiere
@@ -16,6 +16,9 @@ Aplicație personală de bani: fonduri, cheltuieli, crypto (cu toate fee-urile),
 | `styles.css` | Aspectul |
 | `sw.js` | Ține aplicația pe telefon ca să meargă fără internet |
 | `vendor/xlsx.mini.min.js` | Exportul în Excel (SheetJS, licență Apache 2.0) |
+| `city-sync.js`, `vendor/jsQR.js` | Scanare QR, aprobare cu cheia de acces și transfer criptat către oraș |
+
+În 1.6, Crypto și Earn au un istoric comun. Corecturile și transferurile nu sunt venit. În Setări → Crypto se verifică diferențele Earn vechi: alegerea schimbă raportul, păstrând cantitatea. Recompensele confirmate sunt evaluate la cotația disponibilă; estimările sunt separate. Teste de calcul: `node --test tests/crypto.test.js`.
 
 ## Actualizare
 

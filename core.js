@@ -341,7 +341,10 @@
         const rate = leiPerUsd();
         stableUsd -= e.usd; stableLei -= e.usd * rate; withdrawnLei += e.lei;
       } else if (e.kind === 'reward') {
-        const p = pos(e.coin); p.qty += e.qty; p.earnQty += e.qty;
+        const p = pos(e.coin); p.qty += e.qty; if (!rewardNeedsReview(e) && e.incomeClass !== 'correction') p.earnQty += e.qty;
+      } else if (e.kind === 'costFix') {
+        const p=pos(e.coin), rate=p.costUsd>1e-9?p.costLei/p.costUsd:leiPerUsd();
+        p.costUsd=e.costUsd;p.costLei=e.costUsd*rate;
       } else if (e.kind === 'fix') {
         const p = pos(e.coin), oldLei = p.costLei;
         const ratio = p.costUsd > 1e-9 ? p.costLei / p.costUsd : leiPerUsd();
@@ -358,7 +361,9 @@
     });
     // recompensele Earn care curg zilnic și n-au fost încă trecute ca sumă reală
     const at = uptoISO ? new Date(uptoISO).getTime() : Date.now();
-    (state.earn || []).forEach((e) => {
+    (state.earn || []).forEach((stored) => {
+      const e = earnAt(state, stored, uptoISO);
+      if (!e) return;
       if (e.active === false || !e.start || e.start > (uptoISO || '9999')) return;
       const a = earnAccrued(e, at);
       if (a.acc > 0) { const p = pos(e.coin); p.qty += a.acc; p.earnQty += a.acc; p.earnLive = (p.earnLive || 0) + a.acc; }
@@ -428,25 +433,81 @@
       });
     });
   }
-  /* Pui cifra reală din aplicația exchange-ului: diferența devine recompensă înregistrată, iar estimarea pornește de azi. */
-  function earnFix(state, id, actualQty, date) {
+  // Earn allocations are transfers within the portfolio, never income.
+  function earnLog(state, e, action, date, before, extra) {
+    const event = Object.assign({ id: uid(), kind: 'earnMove', action, date, coin: e.coin,
+      earnId: e.id, qty: e.qty, before: before || null, after: JSON.parse(JSON.stringify(e)) }, extra || {});
+    state.crypto.push(event); return event;
+  }
+  function earnAt(state, stored, uptoISO) {
+    if (!uptoISO) return stored;
+    const moves = state.crypto.filter((x) => x.kind === 'earnMove' && x.earnId === stored.id).sort(byDate);
+    const previous = moves.filter((x) => x.date <= uptoISO);
+    if (previous.length) return previous[previous.length - 1].after;
+    if (moves.length) return moves[0].before;
+    return stored;
+  }
+  function validateEarnAllocation(state, coin, quantity, excludeId) {
+    const rp = cryptoReplay(state);
+    const total = (rp.coins[coin] ? rp.coins[coin].qty : 0) + (coin === 'USDT' || coin === 'USDC' ? rp.stableUsd : 0);
+    const reserved = state.earn.filter((x) => x.active !== false && x.id !== excludeId && (coin === 'USDT' || coin === 'USDC' ? ['USDT', 'USDC'].includes(x.coin) : x.coin === coin)).reduce((sum, x) => sum + x.qty, 0);
+    if (quantity + reserved > total + 1e-9) throw new Error('Cantitatea în Earn depășește portofoliul. Înregistrează întâi monedele sau corectează importul din Setări.');
+  }
+  function earnAdd(state, p) {
+    const coin = String(p.coin || '').trim().toUpperCase(), qty = Number(p.qty), apr = Number(p.apr);
+    if (!/^[A-Z0-9]{2,20}$/.test(coin) || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(apr) || apr < 0) throw new Error('Verifică moneda, cantitatea și APR-ul.');
+    const date = p.start || localISO();
+    if (!Number.isFinite(new Date(date).getTime()) || new Date(date).getTime() > Date.now()) throw new Error('Data de început nu poate fi în viitor.');
+    if (p.type === 'locked' && (!p.end || p.end < date.slice(0, 10))) throw new Error('Verifică data de încheiere Locked.');
+    validateEarnAllocation(state, coin, qty);
+    const e = { id: uid(), coin, qty, apr, type: p.type === 'locked' ? 'locked' : 'flexible', start: date, end: p.end || null, active: true };
+    state.earn.push(e); earnLog(state, e, 'add', date, null); return e;
+  }
+  function earnFix(state, id, actualQty, date, mode) {
     const e = state.earn.find((x) => x.id === id);
-    actualQty = parseFloat(actualQty);
-    if (!e) throw new Error('Nu găsesc poziția.');
-    if (!(actualQty >= 0)) throw new Error('Scrie cantitatea.');
-    date = date || localISO();
-    const diff = actualQty - e.qty;
-    if (Math.abs(diff) > 1e-12) state.crypto.push({ id: uid(), kind: 'reward', date, coin: e.coin, qty: diff, note: 'Earn ' + (e.type === 'locked' ? 'Locked' : 'Flexible'), earnId: e.id });
-    e.qty = actualQty; e.start = date.slice(0, 10);
+    actualQty = Number(actualQty); mode = mode || 'correction'; date = date || localISO();
+    if (!e || e.active === false) throw new Error('Poziția Earn nu este activă.');
+    if (!Number.isFinite(actualQty) || actualQty < 0) throw new Error('Scrie o cantitate validă.');
+    if (!['correction', 'transfer', 'reward'].includes(mode)) throw new Error('Alege tipul operațiunii.');
+    if (new Date(date).getTime() < new Date(e.start).getTime()) throw new Error('Data este înaintea ultimei operațiuni Earn.');
+    const before = JSON.parse(JSON.stringify(e)), diff = actualQty - e.qty;
+    if (mode === 'reward' && diff < 0) throw new Error('O recompensă nu poate fi negativă. Alege corectură sau transfer.');
+    if (mode !== 'reward') validateEarnAllocation(state, e.coin, actualQty, e.id);
+    if (mode === 'reward' && diff > 1e-12) state.crypto.push({ id: uid(), kind: 'reward', date, coin: e.coin, qty: diff, note: 'Recompensă Earn confirmată', earnId: e.id, confirmed: true });
+    e.qty = actualQty; e.start = date;
+    earnLog(state, e, mode, date, before, { delta: diff });
     return diff;
   }
   function earnStop(state, id, date) {
     const e = state.earn.find((x) => x.id === id);
-    if (!e) return;
+    if (!e || e.active === false) return;
     date = date || localISO();
-    const a = earnAccrued(e, new Date(date).getTime());
-    if (a.acc > 1e-12) state.crypto.push({ id: uid(), kind: 'reward', date, coin: e.coin, qty: a.acc, note: 'Earn (la retragere)', earnId: e.id });
+    const before = JSON.parse(JSON.stringify(e));
     e.active = false; e.stoppedAt = date;
+    earnLog(state, e, 'stop', date, before);
+  }
+  function rewardNeedsReview(e) {
+    return e.kind === 'reward' && !!e.earnId && !e.confirmed && !e.incomeClass;
+  }
+  function classifyReward(state, id, classification) {
+    const e = state.crypto.find((x) => x.id === id);
+    if (!e || e.kind !== 'reward' || !['reward', 'correction'].includes(classification)) throw new Error('Operațiune invalidă.');
+    if (classification === 'reward' && e.qty < 0) throw new Error('O diferență negativă nu este recompensă.');
+    const before = e.incomeClass || 'unreviewed'; e.incomeClass = classification;
+    state.crypto.push({ id: uid(), kind: 'classification', date: localISO(), coin: e.coin, target: id, beforeClass: before, incomeClass: classification, qty: e.qty });
+  }
+  function cryptoHistory(state) {
+    const events = state.crypto.slice();
+    // Old backups do not contain allocation events. Show only the last known state, without inventing transactions.
+    state.earn.forEach((e) => {
+      if (!events.some((x) => x.kind === 'earnMove' && x.earnId === e.id)) events.push({ id: 'legacy-' + e.id, kind: 'earnMove', action: 'legacy', date: e.start, coin: e.coin, qty: e.qty, after: e });
+    });
+    return events.sort(byDate).reverse();
+  }
+  function cryptoEventLabel(e) {
+    if(e.kind==='costFix')return 'Corectură preț mediu';
+    if (e.kind === 'earnMove') return { add: 'Intrare în Earn', stop: 'Ieșire din Earn', transfer: 'Transfer Spot ↔ Earn', correction: 'Corectură Earn', reward: 'Sold Earn confirmat', legacy: 'Earn: ultimul sold din backup', checkpoint: 'Actualizare bază Earn' }[e.action] || 'Operațiune Earn';
+    return { deposit: 'Depunere', trade: e.side === 'sell' ? 'Vânzare' : 'Cumpărare', withdraw: 'Retragere', reward: rewardNeedsReview(e) ? 'Diferență Earn de verificat' : e.incomeClass === 'correction' ? 'Corectură import Earn' : 'Recompensă', open: 'Poziție inițială', openStable: 'Dolari inițiali', fix: 'Corectură monedă', fixStable: 'Corectură dolari', fixLei: 'Corectură lei investiți', classification: 'Clasificare diferență veche' }[e.kind] || e.kind;
   }
 
   /* ---------- cont de economii ---------- */
@@ -566,16 +627,16 @@
   function passiveIncome(state, fromISO, toISO) {
     const rate = state.fx.usdRon || 4.8;
     const price = (c) => (c === 'USDT' || c === 'USDC' ? 1 : (state.prices[c] && state.prices[c].p) || 0);
-    let interest = 0, earnLei = 0;
+    let interest = 0, earnLei = 0, earnEstimatedLei = 0, reviewCount = 0;
     state.savings.forEach((e) => { if (e.kind === 'interest' && e.date >= fromISO && e.date < toISO) interest += e.amount; });
-    state.crypto.forEach((e) => { if (e.kind === 'reward' && e.date >= fromISO && e.date < toISO) earnLei += e.qty * price(e.coin) * rate; });
+    state.crypto.forEach((e) => { if (e.kind === 'reward' && e.date >= fromISO && e.date < toISO) { if (rewardNeedsReview(e)) reviewCount++; else if (e.incomeClass !== 'correction') earnLei += e.qty * price(e.coin) * rate; } });
     const a = new Date(fromISO).getTime(), b = Math.min(Date.now(), new Date(toISO).getTime());
     if (b > a) (state.earn || []).forEach((e) => {
       if (e.active === false) return;
       const q = Math.max(0, earnAccrued(e, b).acc - earnAccrued(e, a).acc);
-      earnLei += q * price(e.coin) * rate;
+      earnEstimatedLei += q * price(e.coin) * rate;
     });
-    return { interest: r2(interest), earnLei: r2(earnLei), total: r2(interest + earnLei) };
+    return { interest: r2(interest), earnLei: r2(earnLei), earnEstimatedLei: r2(earnEstimatedLei), reviewCount, total: r2(interest + earnLei) };
   }
   function passiveYearEstimate(state) {
     const s = state.settings.savings, rate = state.fx.usdRon || 4.8;
@@ -587,7 +648,7 @@
   /* ---------- corecturi (când ceva nu s-a importat bine) ---------- */
   function fundSetBalance(state, fund, target, date) {
     target = r2(parseFloat(target));
-    if (!(target === target)) throw new Error('Scrie soldul.');
+    if (!Number.isFinite(target)) throw new Error('Scrie soldul.');
     const diff = r2(target - (balances(state)[fund] || 0));
     if (Math.abs(diff) < 0.005) return 0;
     const al = {}; al[fund] = diff;
@@ -597,12 +658,15 @@
   /* moneda: cantitatea totală reală (inclusiv ce e în Earn) și, opțional, prețul mediu în $ */
   function cryptoFix(state, p) {
     const coin = String(p.coin || '').trim().toUpperCase(), q = parseFloat(p.qty);
-    if (!coin || !(q >= 0)) throw new Error('Scrie moneda și cantitatea.');
+    if (!/^[A-Z0-9]{2,20}$/.test(coin) || !Number.isFinite(q) || !(q >= 0)) throw new Error('Scrie moneda și cantitatea.');
     const date = p.date || localISO();
-    const e = { id: uid(), kind: 'fix', date, coin, qty: q };
+    const previous = cryptoReplay(state).coins[coin];
+    const e = { id: uid(), kind: 'fix', date, coin, qty: q, previousQty: previous ? previous.qty : 0, previousCostUsd: previous ? previous.costUsd : 0 };
+    if (p.avgUsd != null && p.avgUsd !== '' && (!Number.isFinite(Number(p.avgUsd)) || Number(p.avgUsd) < 0)) throw new Error('Prețul mediu trebuie să fie un număr pozitiv sau zero.');
     if (p.avgUsd != null && p.avgUsd !== '' && parseFloat(p.avgUsd) >= 0) e.costUsd = q * parseFloat(p.avgUsd);
+    if(p.priceOnly){if(e.costUsd==null)throw new Error('Lipsește prețul mediu.');e.kind='costFix';state.crypto.push(e);return e;}
     // Earn pe moneda asta: recompensele de până acum sunt deja în cifra reală
-    (state.earn || []).forEach((x) => { if (x.active !== false && x.coin === coin) { x.qty = x.qty + earnAccrued(x, Date.now()).acc; x.start = date.slice(0, 10); } });
+    (state.earn || []).forEach((x) => { if (x.active !== false && x.coin === coin) { const before = JSON.parse(JSON.stringify(x)); x.qty = x.qty + (x.type === 'locked' ? 0 : earnAccrued(x, new Date(date).getTime()).acc); x.start = date; earnLog(state, x, 'checkpoint', date, before); } });
     state.crypto.push(e); return e;
   }
   function cryptoFixStable(state, usdAmount, date) {
@@ -985,8 +1049,8 @@
       'Fond': t.fund || '', 'Fond destinație': t.to || '', 'Notă': t.note || '',
       'Împărțire': Object.keys(t.alloc || {}).map((f) => f + ' ' + t.alloc[f]).join(', ')
     }));
-    const crypto = state.crypto.slice().sort(byDate).map((e) => ({
-      'Dată': e.date.replace('T', ' '), 'Tip': { deposit: 'Depunere', trade: e.side === 'sell' ? 'Vânzare' : 'Cumpărare', withdraw: 'Retragere', reward: 'Recompensă Earn', open: 'Poziție inițială', openStable: 'Dolari inițiali', fix: 'Corectură cantitate', fixStable: 'Corectură dolari', fixLei: 'Corectură lei băgați' }[e.kind],
+    const crypto = cryptoHistory(state).reverse().map((e) => ({
+      'Dată': e.date.replace('T', ' '), 'Tip': cryptoEventLabel(e),
       'Monedă': e.coin || 'USD', 'Cantitate': e.qty || e.received || e.usd || '', 'Sumă $': e.usd || '', 'Lei': e.lei || '',
       'Fee $': e.feeUsd != null ? e.feeUsd : (e.kind === 'deposit' ? r2((e.usd - e.received) * 1e4) / 1e4 : ''), 'Notă': e.note || ''
     }));
@@ -1015,7 +1079,7 @@
     balances, fundsTotal, incomeAlloc, makeTx, addTx, updateTx, deleteTx,
     cashSummary, addCash, exchangeEur,
     cryptoDeposit, cryptoTrade, cryptoWithdraw, cryptoReward, cryptoReplay, cryptoValue,
-    earnSummary, savingsDeposit, savingsWithdraw, savingsBalance, accrueSavings,
+    earnAdd, earnLog, rewardNeedsReview, classifyReward, cryptoHistory, cryptoEventLabel, earnSummary, savingsDeposit, savingsWithdraw, savingsBalance, accrueSavings,
     runRecurring, periodStats, monthRange, monthsBack, feeReport, isExpense,
     netWorth, snapshot, worthSeries, validateBackup, exportRows, kindLabel,
     exName, setPet, setBank, savingsSetup, passiveIncome, passiveYearEstimate, fundSetBalance, cryptoFix, cryptoFixStable, cryptoFixInvested, interestBetween, earnAccrued, earnFix, earnStop, setInterestReal, savingsNext, finYM, availableFunds, fundSeries, savingsReport, investReport, coinsEver, portfolioSeries, goalProgress, paceCompare

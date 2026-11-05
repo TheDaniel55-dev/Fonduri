@@ -2,8 +2,8 @@
 (function () {
   'use strict';
   const FC = window.FC;
-  const APP_VERSION = '1.5.0';            // aceeași cu VERSION din sw.js (verificat de teste)
-  const APP_DATE = '3 noiembrie 2026';
+  const APP_VERSION = '1.6.0';            // aceeași cu VERSION din sw.js (verificat de teste)
+  const APP_DATE = '4 noiembrie 2026';
   const KEY = 'fonduri.data.v1';
   const $app = document.getElementById('app');
 
@@ -324,7 +324,6 @@
       '<div style="position:relative;width:220px;height:220px;align-self:center">' + donut(FUNDS().map((f) => ({ v: b[f], c: fcol(f) })), 220) +
       '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px"><span class="small muted">Total</span><span class="big m" style="font-size:30px">' + fmt(Math.round(total)) + '</span><span class="small muted">lei</span></div></div>' +
       '<div class="grid2"><button class="btn primary" data-a="add" data-k="transfer">' + ic('swap', 18, 2) + 'Mută bani</button><button class="btn" data-a="add" data-k="income">' + ic('plus', 18, 2) + 'Adaugă venit</button></div>' +
-      '<button class="link" data-a="sheet" data-s="fundFix" style="align-self:center;min-height:36px">Soldurile nu se potrivesc? Corectează-le</button>' +
       '<div class="col" style="gap:10px">' + FUNDS().map((f) => {
         const fl = flows[f], c = cash.perFund[f];
         return '<div class="card col" style="gap:10px;padding:14px 16px"><div class="row">' + fundBadge(f) +
@@ -407,7 +406,7 @@
     const est = FC.passiveYearEstimate(S), nx = FC.savingsNext(S);
     return '<section class="card col" style="gap:8px"><div class="row between"><h2 style="font-size:17px">Venit pasiv</h2><span class="small muted">dobândă + Earn</span></div>' +
       '<div class="grid3"><div class="col"><span class="tiny muted">Luna asta</span><span class="m green" style="font-weight:600">+' + fmt(m.total + nx.accrued, 2) + '</span></div><div class="col"><span class="tiny muted">Ultimele 12 luni</span><span class="m green" style="font-weight:600">+' + fmt(y.total, 2) + '</span></div><div class="col"><span class="tiny muted">Pe an, estimat</span><span class="m green" style="font-weight:600">+' + fmt(est.total, 2) + '</span></div></div>' +
-      kv('Dobândă primită luna asta', lei(m.interest, 2)) + kv('Dobândă câștigată, încă neplătită', lei(nx.accrued, 2)) + kv('Recompense Earn luna asta', lei(m.earnLei, 2)) +
+      kv('Dobândă primită luna asta', lei(m.interest, 2)) + kv('Dobândă câștigată, încă neplătită', lei(nx.accrued, 2)) + kv('Recompense confirmate (valoare la prețul actual)', lei(m.earnLei, 2)) + kv('Earn estimat, neconfirmat', lei(m.earnEstimatedLei, 2)) + (m.reviewCount ? '<button class="link" data-a="page" data-p="settings">Diferențe Earn vechi de verificat: ' + m.reviewCount + '</button>' : '') +
       '<span class="tiny muted">Sume în lei; Earn la prețul de acum.</span></section>';
   }
   function dualChart(ser) {
@@ -441,8 +440,8 @@
       (cv.list.length ? '<div class="bar" style="height:10px">' + cv.list.map((c, i) => '<div style="flex:' + (c.valueUsd || 0) + ' 1 0;background:' + coinColor(i) + '"></div>').join('') + '</div>' : '') +
       '<div class="grid2"><button class="btn primary" data-a="sheet" data-s="deposit">Depunere</button><button class="btn" data-a="sheet" data-s="trade" data-side="buy">Cumpără</button>' +
       '<button class="btn" data-a="sheet" data-s="trade" data-side="sell">Vinde</button><button class="btn" data-a="sheet" data-s="withdraw">Retrage în lei</button></div>' +
-      '<button class="link" data-a="sheet" data-s="cryptoFix" style="align-self:flex-start;min-height:32px">Cifrele nu se potrivesc cu ' + esc(EXCH()) + '? Corectează-le</button>' +
       '<span class="tiny muted">' + upd + (cv.missing.length ? '. Fără preț live: ' + cv.missing.join(', ') + ' (socotite la cât te-au costat)' : '') + '</span></section>' +
+      '<button class="btn block" data-a="page" data-p="cryptoHistory">Istoric crypto și Earn</button>' +
       '<section class="col" style="gap:8px"><div class="row between"><h2>Monedele tale</h2><span class="small muted">24h</span></div>' +
       (cv.list.length ? '<div class="card tight">' + cv.list.map((c, i) => coinRow(c, i)).join('') + '</div>' : '<div class="card empty">Nu ai monede încă.</div>') + '</section>' +
       '<section class="card col" style="gap:10px"><div class="row between"><h2 style="font-size:17px">Fee-uri plătite</h2><span class="disp m" style="font-size:18px;font-weight:600">' + lei(fr.total, 2) + '</span></div>' +
@@ -543,8 +542,8 @@
     const totUsd = sum('valueUsd'), totLei = sum('valueLei'), yearUsd = sum('yearUsd'), rewUsd = sum('rewardUsd'), todayUsd = sum('todayUsd');
     const tile = (label, val, sub) => '<div class="col" style="background:var(--bg);border-radius:16px;padding:10px 12px;gap:2px"><span class="tiny muted">' + label + '</span><span class="m green" style="font-size:17px;font-weight:600">' + val + '</span>' + (sub ? '<span class="tiny soft m">' + sub + '</span>' : '') + '</div>';
     return '<section class="card col" style="gap:12px;border-radius:28px;padding:20px"><span class="small muted">Valoare în Earn, cu recompensele</span><span class="big m" style="font-size:40px">' + usd(totUsd) + '</span><span class="small soft m">≈ ' + lei(Math.round(totLei)) + '</span>' +
-      '<div class="grid2">' + tile('Câștigat până acum', '+' + usd(rewUsd), '≈ ' + lei(rewUsd * (S.fx.usdRon || 4.8), 2)) + tile('Primești azi', '+' + usd(todayUsd), 'într-un an ≈ +' + usd(yearUsd)) + '</div>' +
-      '<div class="grid2"><button class="btn primary" data-a="sheet" data-s="earnAdd">Pun în Earn</button><button class="btn" data-a="sheet" data-s="reward">Altă recompensă</button></div>' +
+      '<div class="grid2">' + tile('Recompensă estimată', '+' + usd(rewUsd), '≈ ' + lei(rewUsd * (S.fx.usdRon || 4.8), 2)) + tile('Estimat azi', '+' + usd(todayUsd), 'într-un an ≈ +' + usd(yearUsd)) + '</div>' +
+      '<button class="btn block" data-a="page" data-p="cryptoHistory">Istoric crypto și Earn</button><div class="grid2"><button class="btn primary" data-a="sheet" data-s="earnAdd">Pun în Earn</button><button class="btn" data-a="sheet" data-s="reward">Altă recompensă</button></div>' +
       '<span class="tiny muted" style="line-height:1.5">Recompensa vine în fiecare zi. La Flexible se adaugă singură la suma din Earn și produce și ea, iar valoarea intră automat în totalul investițiilor. Dacă suma din ' + esc(EXCH()) + ' e alta, apasă pe poziție și scrie cifra reală.</span></section>' +
       (list.length ? '<div class="card tight">' + list.map((e) => '<button class="list-row" data-a="sheet" data-s="earnFix" data-id="' + e.id + '"><span class="badge" style="background:color-mix(in srgb,var(--act) 22%,transparent);color:var(--actTxt)">' + esc(e.coin.slice(0, 4)) + '</span>' +
         '<span class="grow"><span class="t">' + qty(+e.qtyNow.toFixed(8)) + ' ' + esc(e.coin) + '</span><span class="s">' + (e.type === 'locked' ? 'Locked' + (e.daysLeft != null ? ', mai sunt ' + e.daysLeft + ' zile' : '') : 'Flexible') + ', APR ' + fmt(e.apr * 100, 2) + '%</span>' +
@@ -638,6 +637,62 @@
       '<span class="v green m">+' + (p.q ? qty(+p.amount.toFixed(8)) : fmt(p.amount, 2)) + '<span class="tiny muted">' + esc(p.unit) + '</span></span></div>';
   }
   /* ================= PAGINĂ: Istoric ================= */
+
+  function updateLivePreview() {
+    const current = document.getElementById('livePreview');
+    if (!current) return;
+    const template = document.createElement('template'); template.innerHTML = sheetHTML();
+    const next = template.content.querySelector('#livePreview');
+    if (next) current.innerHTML = next.innerHTML;
+  }
+  function legacyEarnReview() {
+    const rows = S.crypto.filter((e) => FC.rewardNeedsReview(e));
+    if (!rows.length) return '<span class="small muted">Nu există diferențe Earn vechi neclasificate.</span>';
+    return '<h3>Verifică diferențele Earn din versiunea veche</h3><p class="small muted">Aceste diferențe nu sunt incluse ca venit până le verifici. Cantitățile rămân neschimbate. Nu putem deduce din backup dacă ai primit recompense sau ai corectat un sold.</p>' + rows.map((e) =>
+      '<div class="card col"><b>' + esc(e.coin) + ' · ' + qty(e.qty) + '</b><span class="small">' + esc(e.date) + ' · ' + esc(e.note || '') + '</span><button class="btn" data-a="classifyReward" data-id="' + esc(e.id) + '" data-kind="correction">A fost corectură / mutare</button>' + (e.qty >= 0 ? '<button class="btn" data-a="classifyReward" data-id="' + esc(e.id) + '" data-kind="reward">A fost recompensă reală</button>' : '') + '</div>').join('');
+  }
+  function cryptoHistoryPage() {
+    const query = UI.histQ.trim().toLowerCase();
+    const events = FC.cryptoHistory(S).filter((e) => !query || [FC.cryptoEventLabel(e), e.coin, e.date, e.note].join(' ').toLowerCase().includes(query));
+    return '<main class="screen"><button class="link" data-a="page" data-p="">Înapoi</button><h1>Istoric crypto și Earn</h1><p class="small muted">Operațiuni salvate, inclusiv corecturi. Pentru backupurile vechi afișăm doar informațiile existente, fără a inventa intrări sau retrageri.</p><label class="field">Caută moneda, operațiunea sau data<input id="q" class="input" type="search" data-bind="histQ" data-live="1" value="' + esc(UI.histQ) + '"></label>' +
+      (events.length ? events.map((e) => '<section class="card col"><b>' + esc(FC.cryptoEventLabel(e)) + ' · ' + esc(e.coin || 'USD / lei') + '</b><span class="small muted">' + esc(e.date || '') + '</span>' +
+        (e.qty != null ? kv('Cantitate', qty(e.qty)) : '') + (e.usd != null ? kv('Sumă $', usd(e.usd)) : '') + (e.lei != null ? kv('Lei', lei(e.lei, 2)) : '') +
+        (e.costUsd != null ? kv('Cost total corectat', usd(e.costUsd)) : '') + (e.feeUsd != null ? kv('Comision', usd(e.feeUsd)) : '') +
+        (e.before ? kv('În Earn înainte', qty(e.before.qty)) : '') + (e.after ? kv('APR', fmt(e.after.apr * 100, 2) + '% · ' + esc(e.after.type)) : '') +
+        (e.note ? '<span class="small">' + esc(e.note) + '</span>' : '') +
+        (e.kind === 'reward' && e.earnId ? '<button class="btn" data-a="classifyReward" data-id="' + esc(e.id) + '" data-kind="correction">Clasifică drept corectură</button>' + (e.qty >= 0 ? '<button class="btn" data-a="classifyReward" data-id="' + esc(e.id) + '" data-kind="reward">Clasifică drept recompensă</button>' : '') : '') + '</section>').join('') : '<p class="muted">Nicio operațiune pentru această căutare.</p>') + '</main>';
+  }
+  const COIN_CATALOG = [['BTC','Bitcoin'],['ETH','Ethereum'],['BNB','BNB'],['SOL','Solana'],['XRP','XRP'],['ADA','Cardano'],['DOGE','Dogecoin'],['DOT','Polkadot'],['LINK','Chainlink'],['AVAX','Avalanche'],['LTC','Litecoin'],['BCH','Bitcoin Cash'],['TRX','TRON'],['USDT','Tether'],['USDC','USD Coin'],['TON','Toncoin'],['SUI','Sui'],['NEAR','NEAR Protocol'],['UNI','Uniswap'],['ATOM','Cosmos'],['POL','Polygon'],['APT','Aptos'],['ARB','Arbitrum'],['OP','Optimism'],['SHIB','Shiba Inu'],['PEPE','Pepe']];
+  let coinCatalogLoaded = false;
+  async function loadCoinCatalog() {
+    if (coinCatalogLoaded) return; coinCatalogLoaded = true;
+    try {
+      const data = await fetchJSON('https://data-api.binance.vision/api/v3/exchangeInfo?permissions=SPOT', 10000);
+      const known = new Set(COIN_CATALOG.map((c) => c[0]));
+      data.symbols.filter((x) => x.status === 'TRADING' && x.quoteAsset === 'USDT').forEach((x) => { if (!known.has(x.baseAsset)) { known.add(x.baseAsset); COIN_CATALOG.push([x.baseAsset, x.baseAsset + ' · Binance Spot']); } });
+      const el = document.activeElement; if (el && el.dataset.coinSearch) showCoinSuggestions(el);
+    } catch (_) { coinCatalogLoaded = false; }
+  }
+  function setupCoinSuggestions() {
+    document.querySelectorAll('input[name="coin"], input[name="nc"]').forEach((el) => {
+      el.removeAttribute('list'); el.dataset.coinSearch = '1'; el.setAttribute('autocomplete', 'off');
+      if (!el.nextElementSibling || !el.nextElementSibling.classList.contains('coin-suggestions')) {
+        const box = document.createElement('div'); box.className = 'coin-suggestions col'; el.after(box);
+      }
+    });
+  }
+  function showCoinSuggestions(el) {
+    const q = el.value.trim().toLowerCase(), box = el.nextElementSibling;
+    if (!box || !box.classList.contains('coin-suggestions')) return;
+    box.replaceChildren(); if (q.length < 3) return;
+    const matches = COIN_CATALOG.filter((c) => c[0].toLowerCase().includes(q) || c[1].toLowerCase().includes(q)).slice(0, 8);
+    matches.forEach((c) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = c[0] + ' — ' + c[1];
+      b.addEventListener('click', () => { el.value = c[0]; if (el.dataset.live) UI.form[el.dataset.live] = c[0]; box.replaceChildren(); el.focus({preventScroll:true}); }); box.appendChild(b);
+    });
+    if (!matches.length) { const t = document.createElement('span'); t.className = 'small muted'; t.textContent = 'Nicio potrivire în catalog. Verifică simbolul pe exchange înainte de salvare.'; box.appendChild(t); }
+  }
+
   function historyPage() {
     const q = UI.histQ.trim().toLowerCase();
     const F = UI.histF, C = UI.histCat;
@@ -655,7 +710,7 @@
     if ((F === 'all' || F === 'pas') && !C) {
       const pas = [];
       S.savings.forEach((e) => { if (e.kind === 'interest') pas.push({ date: e.date, _p: { title: 'Dobândă ' + S.settings.savings.name, sub: (e.est ? 'estimată, ' : '') + 'rămâne în cont', amount: e.amount, unit: ' lei' } }); });
-      S.crypto.forEach((e) => { if (e.kind === 'reward') pas.push({ date: e.date, _p: { title: 'Recompensă ' + e.coin, sub: e.note || 'Earn', amount: e.qty, unit: ' ' + e.coin, q: true } }); });
+      S.crypto.forEach((e) => { if (e.kind === 'reward' && !FC.rewardNeedsReview(e) && e.incomeClass !== 'correction') pas.push({ date: e.date, _p: { title: 'Recompensă ' + e.coin, sub: e.note || 'Earn', amount: e.qty, unit: ' ' + e.coin, q: true } }); });
       pas.forEach((x) => { if (!q || (x._p.title + ' ' + x._p.sub).toLowerCase().indexOf(q) >= 0) list.push(x); });
     }
     if (F === 'pas') list = list.filter((x) => x._p);
@@ -733,7 +788,7 @@
       lbl('Fee tranzacționare Spot (%)', '<input class="input" inputmode="decimal" value="' + pct(s.binance.tradeFee) + '" data-a2="bin" data-k="tradeFee">') +
       lbl('Reducere când plătești fee-ul cu BNB (%)', '<input class="input" inputmode="decimal" value="' + pct(s.binance.bnbDiscount) + '" data-a2="bin" data-k="bnbDiscount">') +
       '<label class="switch"><span>Plătesc fee-ul cu BNB</span><input type="checkbox" ' + (s.binance.payFeeInBnb ? 'checked' : '') + ' data-a2="binBnb"></label>' +
-      '<button class="btn block" data-a="sheet" data-s="cryptoFix">Corectez monedele și banii băgați</button>';
+      '<button class="btn block" data-a="sheet" data-s="cryptoFix">Corectez monedele și banii băgați</button>' + legacyEarnReview();
 
     const savBody = lbl('Nume cont', '<input class="input" value="' + esc(s.savings.name) + '" data-a2="sav" data-k="name">') +
       '<div class="grid2">' + lbl('Dobândă pe an (%)', '<input class="input" inputmode="decimal" value="' + pct(s.savings.apr) + '" data-a2="sav" data-k="apr">') + lbl('Impozit (%)', '<input class="input" inputmode="decimal" value="' + pct(s.savings.tax) + '" data-a2="sav" data-k="tax">') + '</div>' +
@@ -796,6 +851,7 @@
       grp('look', 'Aspect', (THEMES[th.accent] || THEMES.mov).name + ', ' + (BGS[th.bg] || BGS.denim).name + ', text ' + (SIZES[th.size] || SIZES.normal)[0].toLowerCase(), lookBody) +
       grp('month', 'Luna financiară', (s.monthStart || 1) === 1 ? 'de pe 1 până la sfârșitul lunii' : 'începe pe ' + s.monthStart, monthBody) +
       grp('priv', 'Confidențialitate', 'Face ID, mod discret', privBody) +
+      grp('city', 'Orașul DSL', 'sincronizare manuală prin QR', '<button class="btn primary block" data-a="syncCity">Scanează QR-ul din oraș</button><p class="small muted">Trimite portofoliul criptat prin Wi-Fi, după aprobarea cu cheia de acces. Datele din telefon rămân sursa principală.</p>' + (localStorage.getItem('fonduri.receiver.v1') ? '<button class="btn" data-a="forgetCity">Uit cheia acestui PC</button>' : '')) +
       grp('data', 'Date', 'export, import', dataBody) +
       '<p class="tiny muted" style="text-align:center">Fonduri ' + APP_VERSION + ', actualizată pe ' + APP_DATE + '</p></main>';
   }
@@ -909,7 +965,7 @@
         '<div class="seg" style="grid-template-columns:1fr 1fr"><button type="button" class="' + (side === 'buy' ? 'on' : '') + '" data-a="formSet" data-k="side" data-v="buy">Cumpăr</button><button type="button" class="' + (side === 'sell' ? 'on' : '') + '" data-a="formSet" data-k="side" data-v="sell">Vând</button></div>' +
         '<div class="field"><label for="f_coin">Moneda</label><input id="f_coin" class="input" name="coin" list="coins" autocapitalize="characters" value="' + esc(F.coin || '') + '" data-live="coin" placeholder="BTC, ETH, LINK" required><datalist id="coins">' + held.map((c) => '<option value="' + c + '">').join('') + '</datalist></div>' +
         '<div class="grid2">' + field('Cantitate', 'qty', F.qty || '', 'inputmode="decimal" data-live="qty" required') + field(side === 'buy' ? 'Total plătit ($)' : 'Total primit ($)', 'usd', F.usd || '', 'inputmode="decimal" data-live="usd" required') + '</div>' +
-        (usdV ? '<div class="card col" style="gap:6px">' + kv('Fee (' + fmt(feeRate * 100, 3) + '%' + (b.payFeeInBnb ? ', în BNB' : '') + ')', usd(usdV * feeRate)) + (F.qty ? kv('Preț pe bucată', usd(usdV / parseFloat(F.qty))) : '') + '</div>' : '') +
+        '<div id="livePreview">' + (usdV ? '<div class="card col" style="gap:6px">' + kv('Fee (' + fmt(feeRate * 100, 3) + '%' + (b.payFeeInBnb ? ', în BNB' : '') + ')', usd(usdV * feeRate)) + (F.qty ? kv('Preț pe bucată', usd(usdV / parseFloat(F.qty))) : '') + '</div>' : '') + '</div>' +
         '<div class="field"><label for="f_date">Data</label><input id="f_date" class="input" type="datetime-local" name="date" value="' + esc(F.date || FC.localISO()) + '" data-live="date"></div>', 'Salvează', 'trade');
     }
     if (s === 'withdraw') return formSheet('Retragere în lei', '<div class="grid2">' + field('Dolari scoși ($)', 'usd', '', 'inputmode="decimal" required') + field('Lei intrați în ' + esc(BANK()), 'lei', '', 'inputmode="decimal" required') + '</div>' +
@@ -918,7 +974,7 @@
       const e = FC.earnSummary(S).find((x) => x.id === A.id); if (!e) return '';
       return formSheet(e.coin + ' în Earn', '<div class="card col" style="gap:6px">' + kv('Pus inițial / la ultima corectură', qty(e.qty)) + kv('Estimat acum', qty(+e.qtyNow.toFixed(8))) + kv('Recompense de la ' + e.start.split('-').reverse().join('.'), '+' + qty(+e.estReward.toFixed(8))) + '</div>' +
         field('Cât ai acum în Earn (din aplicația ' + esc(EXCH()) + ')', 'qty', '', 'inputmode="decimal" required placeholder="' + (+e.qtyNow.toFixed(8)) + '"') +
-        '<span class="small muted" style="line-height:1.5">Diferența față de ce ai pus se salvează ca recompensă primită, iar estimarea zilnică pornește din nou de azi.</span>' +
+        '<label class="field">Motiv<select class="input" name="mode"><option value="correction">Corectură de sold / import (fără venit)</option><option value="transfer">Am mutat monede între Spot și Earn</option><option value="reward">Diferența este numai recompensă primită</option></select></label><span class="small muted">Scrie soldul final. Transferurile și corecturile nu sunt venit. Monedele puse în Earn trebuie să existe deja în portofoliu. Pentru recompense alege explicit ultima opțiune.</span>' +
         '<input type="hidden" name="id" value="' + esc(e.id) + '">' +
         '<button type="button" class="btn danger block" data-a="earnStop" data-id="' + e.id + '">Am scos tot din Earn</button>', 'Salvează suma reală', 'earnFix');
     }
@@ -1013,6 +1069,7 @@
     const y = window.scrollY;
     let main;
     if (!S.settings.setupDone) main = setupPage();
+    else if (UI.page === 'cryptoHistory') main = cryptoHistoryPage();
     else if (UI.page === 'history') main = historyPage();
     else if (UI.page === 'settings') main = settingsPage();
     else if (UI.tab === 'funds') main = fundsScreen();
@@ -1020,7 +1077,12 @@
     else if (UI.tab === 'stats') main = statsScreen();
     else main = homeScreen();
     UI.stay = !!(oldSheet && lastSheetName === UI.sheet);
+    if (UI.stay && UI.slideFrom == null && UI.sheet !== 'add') {
+      updateLivePreview();
+      return;
+    }
     $app.innerHTML = main + (S.settings.setupDone ? tabbar() : '') + sheetHTML();
+    setupCoinSuggestions();
     lastSheetName = UI.sheet; UI.slideFrom = null; UI.stay = false;
     if (key !== lastKey) window.scrollTo(0, 0); else window.scrollTo(0, y);
     lastKey = key;
@@ -1035,6 +1097,8 @@
   function commit(msg) { save(); FC.snapshot(S); save(); if (msg) toast(msg); }
 
   const actions = {
+    syncCity: () => window.startCitySync(),
+    forgetCity: () => ask('Elimini cheia PC-ului de pe telefon? La următoarea scanare verifică fizic QR-ul pe PC-ul tău.', 'Uit cheia', () => { localStorage.removeItem('fonduri.receiver.v1'); render(); }),
     tab: (d) => { UI.tab = d.t; UI.page = null; render(); },
     page: (d) => { UI.page = d.p || null; render(); },
     range: (d) => { UI.range = +d.v; render(); },
@@ -1068,7 +1132,11 @@
       else if (a === '0') a = d.k;
       else if (a.split(',')[1] && a.split(',')[1].length >= 2) { /* maxim 2 zecimale */ }
       else if (a.replace(',', '').length < 9) a += d.k;
-      UI.add.amount = a; render();
+      UI.add.amount = a;
+      const template=document.createElement('template');template.innerHTML=addSheet();
+      const pane=document.querySelector('.sheet .kpane'), next=template.content.querySelector('.kpane');
+      if(pane && next) pane.replaceChildren(...next.childNodes);
+      const button=document.querySelector('.sheet [data-a="saveAdd"]');if(button)button.textContent=template.content.querySelector('[data-a="saveAdd"]').textContent;
     },
     useSc: (d) => { const x = S.shortcuts.find((s) => s.id === d.id); if (x) { Object.assign(UI.add, x.preset, { date: FC.localISO() }); render(); } },
     saveAdd: guard(() => {
@@ -1113,9 +1181,10 @@
       FC.addCash(S, d.d, n); commit((n > 0 ? '+1 ' : '−1 ') + item.label);
       render();
     }),
-    earnStop: (d) => { const e = S.earn.find((x) => x.id === d.id); if (e) ask('Ai scos ' + e.coin + ' din Earn? Recompensele de până azi rămân în portofoliu.', 'Da, l-am scos', () => { FC.earnStop(S, d.id); closeSheet(); commit('Scos din Earn'); }); },
+    classifyReward: (d) => ask('Schimbi clasificarea acestei diferențe? Cantitatea din portofoliu rămâne aceeași; se schimbă numai raportarea ca venit.', 'Confirmă', () => { FC.classifyReward(S, d.id, d.kind); commit('Clasificare salvată'); render(); }),
+    earnStop: (d) => { const e = S.earn.find((x) => x.id === d.id); if (e) ask('Ai scos ' + e.coin + ' din Earn? Recompensele deja confirmate rămân în portofoliu. Confirmă întâi încasările reale; estimările nu se încasează automat.', 'Da, l-am scos', () => { FC.earnStop(S, d.id); closeSheet(); commit('Scos din Earn'); }); },
     savDel: (d) => ask('Ștergi operațiunea?', 'Șterge', () => { const tx = S.tx.find((t) => t.link === d.id); if (tx) FC.deleteTx(S, tx.id); else S.savings = S.savings.filter((e) => e.id !== d.id); commit('Șters'); render(); }),
-    formSet: (d) => { UI.form[d.k] = d.v; render(); },
+    formSet: (d) => { UI.form[d.k] = d.v; lastSheetName = null; render(); },
     catDel: (d) => ask('Ștergi categoria „' + d.c + '”? Tranzacțiile vechi o păstrează.', 'Șterge', () => { S.settings.categories = S.settings.categories.filter((c) => c !== d.c); commit(); render(); }),
     cashOrd: (d) => { const o = S.settings.cashOrder, i = o.indexOf(d.f), j = i + (+d.d); if (i < 0 || j < 0 || j >= o.length) return; [o[i], o[j]] = [o[j], o[i]]; commit(); render(); },
     cashOrdDel: (d) => { S.settings.cashOrder = S.settings.cashOrder.filter((f) => f !== d.f); commit(); render(); },
@@ -1154,31 +1223,31 @@
       closeSheet(); commit(side === 'buy' ? 'Cumpărare salvată' : 'Vânzare salvată'); refreshMarket(false).then(startLive);
     },
     withdraw: (f) => { FC.cryptoWithdraw(S, { usd: num(f.usd), lei: num(f.lei), fund: f.fund.value, date: f.date.value }); closeSheet(); commit('Retragere salvată'); },
-    earnFix: (f) => { const d = FC.earnFix(S, f.id.value, num(f.qty)); closeSheet(); commit(d >= 0 ? 'Salvat: +' + qty(+d.toFixed(8)) + ' recompensă' : 'Salvat'); },
+    earnFix: (f) => { FC.earnFix(S, f.id.value, num(f.qty), null, f.mode.value); closeSheet(); commit('Operațiune Earn salvată în istoric'); },
     reward: (f) => { FC.cryptoReward(S, { coin: f.coin.value, qty: num(f.qty), date: f.date.value }); closeSheet(); commit('Recompensă adăugată'); },
     earnAdd: (f) => {
       const apr = num(f.apr) / 100;
       if (!f.coin.value.trim() || !(num(f.qty) > 0) || !(apr > 0)) throw new Error('Completează moneda, cantitatea și APR-ul.');
-      S.earn.push({ id: FC.uid(), coin: f.coin.value.trim().toUpperCase(), qty: num(f.qty), type: f.type.value, apr, start: f.start.value || FC.localISO().slice(0, 10), end: f.end.value || null, active: true });
+      FC.earnAdd(S, { coin: f.coin.value, qty: num(f.qty), type: f.type.value, apr, start: f.start.value, end: f.end.value });
       closeSheet(); commit('Salvat în Earn'); refreshMarket(false).then(startLive);
     },
     savDep: (f) => { FC.savingsDeposit(S, num(f.amount), f.date.value); closeSheet(); commit('Depus în economii'); },
     savWd: (f) => { FC.savingsWithdraw(S, num(f.amount), f.fund.value, f.date.value); closeSheet(); commit('Retras din economii'); },
     fundFix: (f) => {
-      let n = 0;
-      FUNDS().forEach((fd) => { const el = f['f_' + fd]; if (el && el.value.trim() !== '') { if (FC.fundSetBalance(S, fd, num(el.value))) n++; } });
-      closeSheet(); commit(n ? n + (n === 1 ? ' fond corectat' : ' fonduri corectate') : 'Nimic de schimbat');
+      const draft = JSON.parse(JSON.stringify(S)); let n = 0;
+      FUNDS().forEach((fd) => { const el = f['f_' + fd]; if (el && el.value.trim() !== '') { if (FC.fundSetBalance(draft, fd, num(el.value))) n++; } });
+      S = draft; closeSheet(); commit(n ? n + (n === 1 ? ' fond corectat' : ' fonduri corectate') : 'Nimic de schimbat');
     },
     cryptoFix: (f) => {
-      let n = 0;
-      FC.cryptoValue(S).list.forEach((c) => {
+      const draft = JSON.parse(JSON.stringify(S)); let n = 0;
+      FC.cryptoValue(draft).list.forEach((c) => {
         const q = f['q_' + c.coin], pr = f['p_' + c.coin];
-        if ((q && q.value.trim()) || (pr && pr.value.trim())) { FC.cryptoFix(S, { coin: c.coin, qty: q && q.value.trim() ? num(q.value) : c.qty, avgUsd: pr && pr.value.trim() ? num(pr.value) : '' }); n++; }
+        if ((q && q.value.trim()) || (pr && pr.value.trim())) { FC.cryptoFix(draft, { coin: c.coin, priceOnly: !(q && q.value.trim()), qty: q && q.value.trim() ? num(q.value) : c.qty, avgUsd: pr && pr.value.trim() ? num(pr.value) : '' }); n++; }
       });
-      if (f.nc.value.trim() && f.nq.value.trim()) { FC.cryptoFix(S, { coin: f.nc.value, qty: num(f.nq.value), avgUsd: f.np.value.trim() ? num(f.np.value) : '' }); n++; }
-      if (f.stable.value.trim()) { FC.cryptoFixStable(S, num(f.stable.value)); n++; }
-      if (f.invLei.value.trim()) { FC.cryptoFixInvested(S, num(f.invLei.value)); n++; }
-      closeSheet(); commit(n ? 'Corecturi salvate: ' + n : 'Nimic de schimbat'); refreshMarket(false).then(startLive);
+      if (f.nc.value.trim() && f.nq.value.trim()) { FC.cryptoFix(draft, { coin: f.nc.value, qty: num(f.nq.value), avgUsd: f.np.value.trim() ? num(f.np.value) : '' }); n++; }
+      if (f.stable.value.trim()) { FC.cryptoFixStable(draft, num(f.stable.value)); n++; }
+      if (f.invLei.value.trim()) { FC.cryptoFixInvested(draft, num(f.invLei.value)); n++; }
+      S = draft; closeSheet(); commit(n ? 'Corecturi salvate: ' + n : 'Nimic de schimbat'); refreshMarket(false).then(startLive);
     },
     savSetup: (f) => {
       S.settings.savings.apr = num(f.apr) / 100; S.settings.savings.tax = num(f.tax) / 100;
@@ -1413,7 +1482,7 @@
       if (fx && fx.rates && fx.rates.RON) { S.fx.byDate[d] = fx.rates.RON; UI.form.ref = fx.rates.RON; save(); }
     } catch (e) { UI.form.ref = null; }
     UI.form.refLoading = false;
-    if (UI.sheet === 'deposit') render();
+    if (UI.sheet === 'deposit') updateLivePreview();
   }
 
   /* ================= Face ID (passkey local) ================= */
@@ -1506,6 +1575,7 @@
   });
   document.addEventListener('input', (ev) => {
     const el = ev.target;
+    if (el.dataset.coinSearch) { showCoinSuggestions(el); loadCoinCatalog(); }
     if (el.dataset.bind) {
       const path = el.dataset.bind.split('.');
       if (path[0] === 'add') UI.add[path[1]] = el.value; else UI[path[0]] = el.value;
@@ -1515,10 +1585,7 @@
     if (el.dataset.live) {
       UI.form[el.dataset.live] = el.value;
       if (UI.sheet === 'deposit' && el.dataset.live === 'date') { UI.form.ref = null; loadRefRate(el.value); }
-      clearTimeout(window._lt); window._lt = setTimeout(() => {
-        const pos = el.selectionStart, id = el.id; render();
-        const n = document.getElementById(id); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { /* date */ } }
-      }, 350);
+      updateLivePreview();
       return;
     }
     if (el.dataset.a2 && el.type !== 'checkbox' && el.type !== 'file') onSettingInput(el);
@@ -1578,6 +1645,16 @@
     refreshMarket(false).then(startLive);
   }
   render();
+  window.fonduriSnapshot = () => {
+    if(S.settings.lock.enabled && !unlocked)throw Error('Deblochează Fonduri înainte de sincronizare.');
+    if(!S.settings.setupDone || !(S.tx.length || S.crypto.length || S.earn.length))throw Error('Nu există un portofoliu în această fereastră. Deschide aplicația Fonduri în care îți vezi soldurile și scanează din Setări.');
+    const rp = FC.cryptoReplay(S), b = FC.balances(S);
+    return {v:1, at:Date.now(), source:APP_VERSION,
+      funds:Object.keys(b).map(name=>({name,balance:b[name]})),
+      coins:Object.values(rp.coins).filter(c=>c.qty>0).map(c=>({coin:c.coin,qty:Math.max(0,c.qty-(c.earnLive||0)),costUsd:c.costUsd,costLei:c.costLei})),
+      stableUsd:rp.stableUsd,stableLei:rp.stableLei,netInvestedLei:rp.depositedLei-rp.withdrawnLei,
+      earn:S.earn.filter(e=>e.active!==false).map(e=>({coin:e.coin,qty:e.qty,apr:e.apr,type:e.type,start:e.start,end:e.end||null}))};
+  };
   if (S.settings.lock.enabled && S.settings.lock.credId) showLock(); else afterUnlock();
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});

@@ -158,3 +158,9 @@ details.set>summary::-webkit-details-marker{display:none}
 details.set>summary svg{transition:transform .2s;color:var(--muted);flex-shrink:0}
 details.set[open]>summary svg{transform:rotate(90deg)}
 .icon-btn:disabled{opacity:.35}
+
+/* Stable layout while the phone keyboard changes the visual viewport. */
+.sheet{max-height:calc(100svh - var(--safe-top) - 12px)}
+.sheet.stay .seg.glide .ind{animation:none}
+.coin-suggestions:empty{display:none}
+.coin-suggestions{gap:4px;margin-top:6px}
