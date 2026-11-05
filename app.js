@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const FC = window.FC;
-  const APP_VERSION = '1.6.1';            // aceeași cu VERSION din sw.js (verificat de teste)
+  const APP_VERSION = '1.6.2';            // aceeași cu VERSION din sw.js (verificat de teste)
   const APP_DATE = '5 noiembrie 2026';
   const KEY = 'fonduri.data.v1';
   const $app = document.getElementById('app');
@@ -852,6 +852,7 @@
       grp('month', 'Luna financiară', (s.monthStart || 1) === 1 ? 'de pe 1 până la sfârșitul lunii' : 'începe pe ' + s.monthStart, monthBody) +
       grp('priv', 'Confidențialitate', 'Face ID, mod discret', privBody) +
       grp('city', 'Orașul DSL', 'sincronizare manuală prin QR', '<button class="btn primary block" data-a="syncCity">Scanează QR-ul din oraș</button><p class="small muted">Trimite portofoliul criptat prin Wi-Fi, după aprobarea cu cheia de acces. Datele din telefon rămân sursa principală.</p>' + (localStorage.getItem('fonduri.receiver.v1') ? '<button class="btn" data-a="forgetCity">Uit cheia acestui PC</button>' : '')) +
+      grp('changeLog', 'Change Log', 'Istoricul versiunilor', '<dsl-change-log></dsl-change-log>') +
       grp('data', 'Date', 'export, import', dataBody) +
       '<p class="tiny muted" style="text-align:center">Fonduri ' + APP_VERSION + ', actualizată pe ' + APP_DATE + '</p></main>';
   }

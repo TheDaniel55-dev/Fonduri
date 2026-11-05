@@ -1,8 +1,8 @@
 /* Fonduri — păstrează aplicația pe telefon ca să meargă fără internet.
    Când schimbi ceva în aplicație, crește numărul versiunii de mai jos. */
-const VERSION = 'fonduri-v1.6.1';
+const VERSION = 'fonduri-v1.6.2';
 const SHELL = [
-  './', 'index.html', 'styles.css', 'core.js', 'app.js', 'city-sync.js', 'vendor/jsQR.js', 'manifest.webmanifest', 'vendor/xlsx.mini.min.js',
+  './', 'index.html', 'styles.css', 'core.js', 'app.js', 'change-log.js', 'CHANGELOG.md', 'city-sync.js', 'vendor/jsQR.js', 'manifest.webmanifest', 'vendor/xlsx.mini.min.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
   'fonts/bricolage-grotesque-latin-500-normal.woff2', 'fonts/bricolage-grotesque-latin-600-normal.woff2', 'fonts/bricolage-grotesque-latin-700-normal.woff2',
   'fonts/bricolage-grotesque-latin-ext-500-normal.woff2', 'fonts/bricolage-grotesque-latin-ext-600-normal.woff2', 'fonts/bricolage-grotesque-latin-ext-700-normal.woff2',
