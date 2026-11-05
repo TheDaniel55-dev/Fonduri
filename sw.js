@@ -1,6 +1,6 @@
 /* Fonduri — păstrează aplicația pe telefon ca să meargă fără internet.
    Când schimbi ceva în aplicație, crește numărul versiunii de mai jos. */
-const VERSION = 'fonduri-v1.6.2';
+const VERSION = 'fonduri-v1.6.3';
 const SHELL = [
   './', 'index.html', 'styles.css', 'core.js', 'app.js', 'change-log.js', 'CHANGELOG.md', 'city-sync.js', 'vendor/jsQR.js', 'manifest.webmanifest', 'vendor/xlsx.mini.min.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
@@ -18,6 +18,7 @@ self.addEventListener('activate', (e) => {
 });
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
+  if (url.searchParams.has('update-check')) return;
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;   // prețuri, curs: mereu de pe internet
   // întâi încercăm versiunea nouă de pe internet, dacă nu merge folosim copia de pe telefon
   e.respondWith(
@@ -26,4 +27,8 @@ self.addEventListener('fetch', (e) => {
       return res;
     }).catch(() => caches.match(e.request, { ignoreSearch: true }).then((r) => r || caches.match('index.html')))
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });

@@ -164,3 +164,13 @@ details.set[open]>summary svg{transform:rotate(90deg)}
 .sheet.stay .seg.glide .ind{animation:none}
 .coin-suggestions:empty{display:none}
 .coin-suggestions{gap:4px;margin-top:6px}
+
+/* Keep the keypad in place when the first digit creates allocation rows. */
+.income-distribution{box-sizing:border-box;height:8rem;overflow:auto;gap:10px;padding:12px 14px;overflow-anchor:none}
+.income-distribution>.bar{flex-shrink:0}
+@keyframes screenEnter{from{opacity:.86}to{opacity:1}}
+@media (prefers-reduced-motion:no-preference){
+  .screen-enter{animation:screenEnter .14s ease-out}
+  .keypad button,.chip,.btn{transition:background-color .12s ease,box-shadow .12s ease}
+  .keypad button:active,.chip:active{box-shadow:inset 0 0 0 2px var(--act)}
+}

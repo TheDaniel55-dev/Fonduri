@@ -1,5 +1,16 @@
 # Change Log — Fonduri
 
+## 1.6.3 · 5 noiembrie 2026
+### Tastatura rămâne pe loc la venituri
+Împărțirea între fonduri are spațiu rezervat înainte să introduci prima cifră. Dacă ai multe fonduri, poți derula în interiorul împărțirii.
+### Scurtături cu nume și sumă
+Poți salva configurația din formular separat sau odată cu tranzacția. Selectarea unei scurtături completează suma, tipul, fondurile, nota și opțiunile euro. Data este cea curentă. Scurtăturile vechi care nu conțin o sumă cer introducerea ei.
+### Feedback discret la apăsare
+La navigarea între pagini, conținutul apare gradual timp de 140 ms. Tastele și butoanele schimbă discret culoarea la apăsare. Tranzițiile noi respectă preferința de mișcare redusă.
+
+### Verificarea actualizărilor din Setări
+Butonul de lângă versiune caută o actualizare și reîncarcă aplicația când există o versiune nouă. Afișează un mesaj dacă versiunea este actuală sau dacă lipsește conexiunea.
+
 ## 1.6.2 · 5 noiembrie 2026
 ### Istoricul versiunilor în Setări
 Deschide Change Log și apasă pe titlul unei modificări pentru detalii. Istoricul este inclus în copia offline a aplicației.

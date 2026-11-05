@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const FC = window.FC;
-  const APP_VERSION = '1.6.2';            // aceeași cu VERSION din sw.js (verificat de teste)
+  const APP_VERSION = '1.6.3';            // aceeași cu VERSION din sw.js (verificat de teste)
   const APP_DATE = '5 noiembrie 2026';
   const KEY = 'fonduri.data.v1';
   const $app = document.getElementById('app');
@@ -854,7 +854,7 @@
       grp('city', 'Orașul DSL', 'sincronizare manuală prin QR', '<button class="btn primary block" data-a="syncCity">Scanează QR-ul din oraș</button><p class="small muted">Trimite portofoliul criptat prin Wi-Fi, după aprobarea cu cheia de acces. Datele din telefon rămân sursa principală.</p>' + (localStorage.getItem('fonduri.receiver.v1') ? '<button class="btn" data-a="forgetCity">Uit cheia acestui PC</button>' : '')) +
       grp('changeLog', 'Change Log', 'Istoricul versiunilor', '<dsl-change-log></dsl-change-log>') +
       grp('data', 'Date', 'export, import', dataBody) +
-      '<p class="tiny muted" style="text-align:center">Fonduri ' + APP_VERSION + ', actualizată pe ' + APP_DATE + '</p></main>';
+      '<div class="row" style="justify-content:center;flex-wrap:wrap;gap:10px"><span class="tiny muted">Fonduri ' + APP_VERSION + ' · ' + APP_DATE + '</span><button class="btn" data-a="updateApp">Verifică actualizări</button></div></main>';
   }
   function fundEditor(f) {
     return '<div class="col" style="gap:12px;background:var(--bg);border-radius:18px;padding:14px;margin-bottom:8px">' +
@@ -878,8 +878,17 @@
 
   /* --- adăugare tranzacție --- */
   function newAdd(kind, preset) {
-    return Object.assign({ kind: kind || 'expense', amount: '0', cat: S.settings.categories[0], fund: EXP(), fundFrom: FUNDS()[FUNDS().length - 1], fundTo: FUNDS().find((f) => f !== EXP()) || FUNDS()[0], sub: INC()[0], eur: false, keepEur: false, note: '', date: FC.localISO(), saveSc: false, editId: null }, preset || {});
+    return Object.assign({ kind: kind || 'expense', amount: '0', cat: S.settings.categories[0], fund: EXP(), fundFrom: FUNDS()[FUNDS().length - 1], fundTo: FUNDS().find((f) => f !== EXP()) || FUNDS()[0], sub: INC()[0], eur: false, keepEur: false, note: '', date: FC.localISO(), saveSc: false, shortcutName: '', editId: null }, preset || {});
   }
+  function makeShortcut(a) {
+    const label = a.shortcutName.trim();
+    if (!label) throw new Error('Scrie numele scurtăturii.');
+    const value = Number(String(a.amount).replace(',', '.'));
+    if (!Number.isFinite(value) || value <= 0) throw new Error('Introdu suma prestabilită.');
+    const {kind, cat, fund, fundFrom, fundTo, sub, note, eur, keepEur, amount} = a;
+    return {id: FC.uid(), label, preset: {kind, cat, fund, fundFrom, fundTo, sub, note, eur, keepEur, amount}};
+  }
+
   function addSheet() {
     const a = UI.add;
     const num = parseFloat(String(a.amount).replace(',', '.')) || 0;
@@ -897,14 +906,14 @@
       extra += '<div class="seg" style="grid-template-columns:repeat(' + INC().length + ',minmax(0,1fr))">' + INC().map((t) => '<button class="' + (a.sub === t ? 'on' : '') + '" data-a="addSet" data-k="sub" data-v="' + t + '">' + t + '</button>').join('') + '</div>' +
         '<label class="switch"><span>Primit în euro (' + S.settings.eurRate + ' lei/€)</span><input type="checkbox" ' + (a.eur ? 'checked' : '') + ' data-a2="addEur"></label>' +
         (a.eur ? '<label class="switch"><span>Îi păstrez cash în pușculiță</span><input type="checkbox" ' + (a.keepEur ? 'checked' : '') + ' data-a2="addKeep"></label>' : '') +
-        '<div class="card col" style="gap:10px;padding:12px 14px"><div class="bar">' + FUNDS().filter((f) => prev[f] > 0).map((f) => '<div style="flex:' + prev[f] + ' 1 0;background:' + fcol(f) + '"></div>').join('') + '</div><div class="split-grid">' +
-        FUNDS().filter((f) => prev[f]).map((f) => '<div class="row small" style="gap:8px"><span style="width:8px;height:8px;border-radius:3px;background:' + fcol(f) + '"></span><span class="soft" style="flex:1">' + f + '</span><span style="font-weight:600">' + fmt(prev[f], 2) + '</span></div>').join('') + '</div></div>';
+        '<div class="card col income-distribution" aria-label="Împărțirea venitului"><div class="bar">' + FUNDS().filter((f) => prev[f] > 0).map((f) => '<div style="flex:' + prev[f] + ' 1 0;background:' + fcol(f) + '"></div>').join('') + '</div><div class="split-grid">' +
+        (!num ? '<span class="small muted">Împărțirea apare aici când introduci suma.</span>' : '') + FUNDS().filter((f) => prev[f]).map((f) => '<div class="row small" style="gap:8px"><span style="width:8px;height:8px;border-radius:3px;background:' + fcol(f) + '"></span><span class="soft" style="flex:1">' + f + '</span><span style="font-weight:600">' + fmt(prev[f], 2) + '</span></div>').join('') + '</div></div>';
     } else if (a.kind === 'transfer') {
       extra += '<span class="small muted">Din</span><div class="chips">' + FUNDS().map((f) => chipFund(f, a.fundFrom === f, 'fundFrom')).join('') + '</div>' +
         '<span class="small muted">În</span><div class="chips">' + FUNDS().map((f) => chipFund(f, a.fundTo === f, 'fundTo')).join('') + '</div>';
     }
     const sub = a.kind === 'expense' ? a.cat + ', din ' + EXP() : a.kind === 'fund' ? a.cat + ', din ' + a.fund : a.kind === 'income' ? (a.eur ? '= ' + lei(leiAmt, 2) + ', se împarte automat' : 'Se împarte automat în fonduri') : a.fundFrom + ' → ' + a.fundTo;
-    const sc = !a.editId && S.shortcuts.length ? '<div class="chips">' + S.shortcuts.map((x) => '<button class="chip" data-a="useSc" data-id="' + x.id + '" style="border-style:dashed">' + esc(x.label) + '</button>').join('') + '</div>' : '';
+    const sc = !a.editId && S.shortcuts.length ? '<div class="chips">' + S.shortcuts.map((x) => '<button class="chip" data-a="useSc" data-id="' + x.id + '" style="border-style:dashed">' + esc(x.label) + (x.preset.amount ? ' · ' + esc(x.preset.amount) + (x.preset.kind === 'income' && x.preset.eur ? ' €' : ' lei') : '') + '</button>').join('') + '</div>' : '';
     const ki = types.findIndex((t) => t[0] === a.kind);
     const fromI = UI.slideFrom != null ? UI.slideFrom : ki;
     const body = sc +
@@ -916,6 +925,7 @@
       '<div class="field"><label for="f_note">Notă</label><input id="f_note" class="input" value="' + esc(a.note) + '" data-bind="add.note" placeholder="opțional"></div>' +
       '<div class="field"><label for="f_date">Data</label><input id="f_date" class="input" type="datetime-local" value="' + esc(a.date) + '" data-bind="add.date"></div>' +
       (!a.editId ? '<label class="switch"><span>Salvează ca scurtătură</span><input type="checkbox" ' + (a.saveSc ? 'checked' : '') + ' data-a2="addSc"></label>' : '') +
+      (!a.editId && a.saveSc ? '<div class="field"><label for="scLabel">Numele scurtăturii</label><input class="input" id="scLabel" data-bind="add.shortcutName" maxlength="60" value="' + esc(a.shortcutName) + '" placeholder="De exemplu: Venit suplimentar"><button type="button" class="btn" data-a="saveShortcutOnly">Salvează doar scurtătura</button></div>' : '') +
       '<button class="btn primary block" data-a="saveAdd" style="min-height:56px;font-size:16px">' + (a.editId ? 'Salvează modificarea' : 'Salvează ' + shown + ' ' + (a.kind === 'income' && a.eur ? '€' : 'lei')) + '</button>' +
       (a.editId ? '<button class="btn danger block" data-a="delTx" data-id="' + a.editId + '">' + ic('trash', 18) + 'Șterge tranzacția</button>' : '');
     return sheetWrap(a.editId ? 'Modifică' : 'Tranzacție nouă', body);
@@ -1086,6 +1096,9 @@
     setupCoinSuggestions();
     lastSheetName = UI.sheet; UI.slideFrom = null; UI.stay = false;
     if (key !== lastKey) window.scrollTo(0, 0); else window.scrollTo(0, y);
+    if (lastKey && key !== lastKey && !UI.sheet) {
+      $app.querySelector('.screen')?.classList.add('screen-enter');
+    }
     lastKey = key;
     const ns = document.querySelector('.sheet');
     if (ns && oldSheet) ns.scrollTop = sheetScroll;
@@ -1097,7 +1110,55 @@
   function closeSheet() { UI.sheet = null; UI.args = {}; UI.add = null; UI.form = {}; render(); }
   function commit(msg) { save(); FC.snapshot(S); save(); if (msg) toast(msg); }
 
+  let checkingUpdate = false;
+  async function checkAppUpdate(button) {
+    if (checkingUpdate) return;
+    checkingUpdate = true;
+    button.disabled = true;
+    button.textContent = 'Verific…';
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      if (!navigator.onLine) throw new Error('Conectează-te la internet pentru actualizare.');
+      const response = await fetch('sw.js?update-check=' + Date.now(), {cache:'no-store', signal:controller.signal});
+      if (!response.ok) throw new Error('Actualizarea nu este disponibilă momentan.');
+      const source = await response.text();
+      const version = source.match(/const VERSION = 'fonduri-v?([^']+)'/);
+      if (!version) throw new Error('Nu am putut verifica versiunea disponibilă.');
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+          await registration.update();
+          const worker = registration.installing || registration.waiting;
+          if (worker) await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => finish(new Error('Actualizarea durează mai mult. Încearcă din nou.')), 20000);
+            function finish(error) {
+              clearTimeout(timer);worker.removeEventListener('statechange', changed);
+              if (error) reject(error); else resolve();
+            }
+            function changed() {
+              if (worker.state === 'activated') finish();
+              else if (worker.state === 'redundant') finish(new Error('Descărcarea versiunii a eșuat. Încearcă din nou.'));
+            }
+            worker.addEventListener('statechange', changed);
+            worker.postMessage({type:'SKIP_WAITING'});
+            changed();
+          });
+        }
+      }
+      if (version[1] === APP_VERSION) { toast('Ai deja cea mai recentă versiune, ' + APP_VERSION + '.'); return; }
+      localStorage.setItem(KEY, JSON.stringify(S));
+      location.reload();
+    } catch (error) {
+      toast(error.name === 'AbortError' ? 'Verificarea a durat prea mult. Încearcă din nou.' : error.message, true);
+    } finally {
+      clearTimeout(timeout); checkingUpdate = false;
+      button.disabled = false;button.textContent = 'Verifică actualizări';
+    }
+  }
+
   const actions = {
+    updateApp: (_, button) => checkAppUpdate(button),
     syncCity: () => window.startCitySync(),
     forgetCity: () => ask('Elimini cheia PC-ului de pe telefon? La următoarea scanare verifică fizic QR-ul pe PC-ul tău.', 'Uit cheia', () => { localStorage.removeItem('fonduri.receiver.v1'); render(); }),
     tab: (d) => { UI.tab = d.t; UI.page = null; render(); },
@@ -1139,7 +1200,13 @@
       if(pane && next) pane.replaceChildren(...next.childNodes);
       const button=document.querySelector('.sheet [data-a="saveAdd"]');if(button)button.textContent=template.content.querySelector('[data-a="saveAdd"]').textContent;
     },
-    useSc: (d) => { const x = S.shortcuts.find((s) => s.id === d.id); if (x) { Object.assign(UI.add, x.preset, { date: FC.localISO() }); render(); } },
+    useSc: (d) => { const x = S.shortcuts.find((s) => s.id === d.id); if (x && !UI.add.editId) { UI.add = newAdd(x.preset.kind, x.preset); render(); } },
+    saveShortcutOnly: guard(() => {
+      S.shortcuts.push(makeShortcut(UI.add));
+      UI.add.saveSc = false;
+      UI.add.shortcutName = '';
+      commit('Scurtătură salvată'); render();
+    }),
     saveAdd: guard(() => {
       const a = UI.add;
       const num = parseFloat(String(a.amount).replace(',', '.')) || 0;
@@ -1158,12 +1225,10 @@
       else if (a.kind === 'fund') p = { kind: 'fund', amount: num, fund: a.fund, cat: a.cat, note: a.note, date };
       else if (a.kind === 'transfer') p = { kind: 'transfer', amount: num, fund: a.fundFrom, to: a.fundTo, note: a.note, date };
       else p = { kind: 'income', sub: a.sub, amount: a.eur ? num * S.settings.eurRate : num, eur: a.eur ? num : null, note: a.note, date };
+      const shortcut = a.saveSc ? makeShortcut(a) : null;
       const t = FC.addTx(S, p);
       if (a.kind === 'income' && a.eur && a.keepEur) { const ed = S.settings.denoms.find((x) => x.cur === 'EUR'); if (ed) FC.addCash(S, ed.id, num / (ed.value || 1), 'Din ' + a.sub, date); }
-      if (a.saveSc) {
-        const label = a.note || (a.kind === 'income' ? a.sub : a.cat);
-        S.shortcuts.push({ id: FC.uid(), label, preset: { kind: a.kind, cat: a.cat, fund: a.fund, fundFrom: a.fundFrom, fundTo: a.fundTo, sub: a.sub, note: a.note, eur: a.eur } });
-      }
+      if (shortcut) S.shortcuts.push(shortcut);
       closeSheet(); commit(t.kind === 'income' ? 'Venit împărțit în fonduri' : 'Salvat');
     }),
     editTx: (d) => {
@@ -1598,7 +1663,7 @@
     if (k === 'import') { if (el.files[0]) importFile(el.files[0]); el.value = ''; return; }
     if (k === 'addEur') { UI.add.eur = el.checked; render(); return; }
     if (k === 'addKeep') { UI.add.keepEur = el.checked; return; }
-    if (k === 'addSc') { UI.add.saveSc = el.checked; return; }
+    if (k === 'addSc') { UI.add.saveSc = el.checked; render(); return; }
     if (k === 'binBnb') { S.settings.binance.payFeeInBnb = el.checked; save(); return; }
     if (k === 'live') { S.settings.live.enabled = el.checked; save(); startLive(); return; }
     if (k === 'home') { S.settings.home[el.dataset.k] = el.checked; save(); return; }
