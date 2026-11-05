@@ -2,8 +2,8 @@
 (function () {
   'use strict';
   const FC = window.FC;
-  const APP_VERSION = '1.6.0';            // aceeași cu VERSION din sw.js (verificat de teste)
-  const APP_DATE = '4 noiembrie 2026';
+  const APP_VERSION = '1.6.1';            // aceeași cu VERSION din sw.js (verificat de teste)
+  const APP_DATE = '5 noiembrie 2026';
   const KEY = 'fonduri.data.v1';
   const $app = document.getElementById('app');
 
@@ -942,7 +942,7 @@
     if (s === 'add') return addSheet();
     if (s === 'txInfo') { const t = S.tx.find((x) => x.id === A.id); return t ? editInfoSheet(t) : ''; }
     if (s === 'deposit') {
-      const ref = F.ref, usdV = parseFloat(F.usd) || 0, leiV = parseFloat(String(F.lei || '').replace(',', '.')) || 0;
+      const ref = F.ref, usdV = num(F.usd) || 0, leiV = num(F.lei) || 0;
       const fee = S.settings.binance.cardFee, rec = usdV * (1 - fee);
       let prev = '';
       if (usdV > 0) {
@@ -952,20 +952,20 @@
       }
       return formSheet('Depunere în ' + EXCH(),
         '<div class="grid2">' + field('Sumă trimisă ($)', 'usd', F.usd || '', 'inputmode="decimal" data-live="usd" required') + field('Lei plecați din ' + esc(BANK()) + ' (din SMS)', 'lei', F.lei || '', 'inputmode="decimal" data-live="lei" placeholder="opțional"') + '</div>' +
-        '<div class="field"><label for="f_date">Data</label><input id="f_date" class="input" type="datetime-local" name="date" value="' + esc(F.date || FC.localISO()) + '" data-live="date"></div>' + prev +
+        '<div class="field"><label for="f_date">Data</label><input id="f_date" class="input" type="datetime-local" name="date" value="' + esc(F.date || FC.localISO()) + '" data-live="date"></div><div id="livePreview">' + prev + '</div>' +
         '<span class="small muted" style="line-height:1.5">Banii pleacă din fondul ' + S.settings.binance.cryptoFund + '. Dacă nu scrii lei, îi estimez după cursul BCE; corectezi oricând.</span>', 'Salvează depunerea', 'deposit');
     }
     if (s === 'trade') {
       const side = F.side || A.side || 'buy';
       const cv = FC.cryptoReplay(S);
       const held = Object.keys(cv.coins).filter((c) => cv.coins[c].qty > 1e-12);
-      const usdV = parseFloat(F.usd) || 0, b = S.settings.binance;
+      const usdV = num(F.usd) || 0, b = S.settings.binance;
       const feeRate = b.tradeFee * (b.payFeeInBnb ? 1 - b.bnbDiscount : 1);
       return formSheet(side === 'buy' ? 'Cumpărare' : 'Vânzare',
         '<div class="seg" style="grid-template-columns:1fr 1fr"><button type="button" class="' + (side === 'buy' ? 'on' : '') + '" data-a="formSet" data-k="side" data-v="buy">Cumpăr</button><button type="button" class="' + (side === 'sell' ? 'on' : '') + '" data-a="formSet" data-k="side" data-v="sell">Vând</button></div>' +
         '<div class="field"><label for="f_coin">Moneda</label><input id="f_coin" class="input" name="coin" list="coins" autocapitalize="characters" value="' + esc(F.coin || '') + '" data-live="coin" placeholder="BTC, ETH, LINK" required><datalist id="coins">' + held.map((c) => '<option value="' + c + '">').join('') + '</datalist></div>' +
         '<div class="grid2">' + field('Cantitate', 'qty', F.qty || '', 'inputmode="decimal" data-live="qty" required') + field(side === 'buy' ? 'Total plătit ($)' : 'Total primit ($)', 'usd', F.usd || '', 'inputmode="decimal" data-live="usd" required') + '</div>' +
-        '<div id="livePreview">' + (usdV ? '<div class="card col" style="gap:6px">' + kv('Fee (' + fmt(feeRate * 100, 3) + '%' + (b.payFeeInBnb ? ', în BNB' : '') + ')', usd(usdV * feeRate)) + (F.qty ? kv('Preț pe bucată', usd(usdV / parseFloat(F.qty))) : '') + '</div>' : '') + '</div>' +
+        '<div id="livePreview">' + (usdV ? '<div class="card col" style="gap:6px">' + kv('Fee (' + fmt(feeRate * 100, 3) + '%' + (b.payFeeInBnb ? ', în BNB' : '') + ')', usd(usdV * feeRate)) + (F.qty ? kv('Preț pe bucată', usd(usdV / num(F.qty))) : '') + '</div>' : '') + '</div>' +
         '<div class="field"><label for="f_date">Data</label><input id="f_date" class="input" type="datetime-local" name="date" value="' + esc(F.date || FC.localISO()) + '" data-live="date"></div>', 'Salvează', 'trade');
     }
     if (s === 'withdraw') return formSheet('Retragere în lei', '<div class="grid2">' + field('Dolari scoși ($)', 'usd', '', 'inputmode="decimal" required') + field('Lei intrați în ' + esc(BANK()), 'lei', '', 'inputmode="decimal" required') + '</div>' +
@@ -1475,14 +1475,15 @@
   }
   async function loadRefRate(dateStr) {
     const d = (dateStr || FC.localISO()).slice(0, 10);
-    if (S.fx.byDate[d]) { UI.form.ref = S.fx.byDate[d]; return; }
-    UI.form.refLoading = true;
+    const form=UI.form;
+    const current=()=>UI.sheet==='deposit' && UI.form===form && (form.date || FC.localISO()).slice(0,10)===d;
+    if (S.fx.byDate[d]) { if(current()){form.ref = S.fx.byDate[d];form.refLoading=false;updateLivePreview();}return; }
+    form.refLoading = true;
     try {
       const fx = await fetchJSON(FX + d + '?base=USD&symbols=RON');
-      if (fx && fx.rates && fx.rates.RON) { S.fx.byDate[d] = fx.rates.RON; UI.form.ref = fx.rates.RON; save(); }
-    } catch (e) { UI.form.ref = null; }
-    UI.form.refLoading = false;
-    if (UI.sheet === 'deposit') updateLivePreview();
+      if (fx && fx.rates && fx.rates.RON) { S.fx.byDate[d] = fx.rates.RON; if(current())form.ref = fx.rates.RON; save(); }
+    } catch (e) { if(current())form.ref = null; }
+    if(current()){form.refLoading = false;updateLivePreview();}
   }
 
   /* ================= Face ID (passkey local) ================= */
