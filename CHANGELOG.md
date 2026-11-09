@@ -1,5 +1,12 @@
 # Change Log — Fonduri
 
+## 1.8.0 · 10 noiembrie 2026
+### Auto-subscribe pe fiecare monedă în Earn
+În Investiții → Earn, cardul Auto-subscribe are un comutator pentru fiecare monedă din portofoliu, iar USDT și USDC apar împreună. La pornire introduci APR-ul Flexible. Tot ce e liber în Spot din moneda respectivă trece imediat în Earn Flexible. Cumpărările următoare intră automat, iar vânzările se scot automat din Earn.
+Recompensa zilnică se adaugă la suma care produce. La fiecare transfer automat, recompensa de până atunci este salvată ca recompensă Earn estimată, fără să se schimbe ziua de plată. În venitul pasiv, aceste recompense apar la Earn estimat până când confirmi soldul real din poziție. Transferurile, pornirea și oprirea apar în Istoric crypto și Earn. Oprirea nu scoate nimic din Earn. O poziție Locked nouă din aceeași monedă micșorează automat partea Flexible.
+### Pun în Earn după miezul nopții
+Între 00:00 și 02:00, adăugarea unei poziții Earn cu data de azi era respinsă cu mesajul că data este în viitor. Data de azi folosește acum ora curentă, iar o dată trecută începe la miezul nopții, ora României.
+
 ## 1.7.0 · 9 noiembrie 2026
 ### Salvează direct din tastatură
 La Tranzacție nouă, butonul Salvează ocupă ultima coloană a tastaturii și arată suma introdusă. Butonul rămâne vizibil fără derulare la cheltuieli, venituri, retrageri din fond și mutări.

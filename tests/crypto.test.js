@@ -76,3 +76,28 @@ test('Display currencies default to lei with dollars below and survive backups',
   const restored = FC.validateBackup({tx: [], settings: {currency: {main: 'USD'}}});
   assert.deepEqual(restored.settings.currency, {main: 'USD', sub: 'USD'});
 });
+test('Auto-subscribe moves new purchases into Flexible Earn and back out on sales, without changing holdings', () => {
+  const s = FC.emptyState(); s.fx.usdRon = 4.4; s.prices.BNB = {p: 900};
+  const day = 864e5, t0 = Date.now() - 10 * day, iso = (ms) => FC.localISO(new Date(ms));
+  FC.cryptoDeposit(s, {usd: 500, lei: 2300, refRate: 4.6, date: iso(t0)});
+  FC.cryptoTrade(s, {side: 'buy', coin: 'BNB', qty: 0.3, usd: 270, date: iso(t0 + 36e5)});
+  const f = FC.earnAutoSet(s, 'BNB', true, 0.10);
+  assert.ok(f.auto && Math.abs(FC.earnSpot(s, 'BNB').free) < 1e-9, 'everything in Spot moved to Earn');
+  f.start = iso(t0 + 72e5);
+  FC.cryptoTrade(s, {side: 'buy', coin: 'BNB', qty: 0.1, usd: 90, date: FC.localISO()});
+  const total = FC.earnSpot(s, 'BNB').total;
+  assert.equal(FC.earnAutoSync(s), 1);
+  assert.ok(Math.abs(FC.earnSpot(s, 'BNB').free) < 1e-9, 'the new purchase went to Earn');
+  assert.ok(Math.abs(FC.earnSpot(s, 'BNB').total - total) < 1e-12, 'holdings unchanged by the transfer');
+  assert.equal(FC.earnAutoSync(s), 0, 'nothing to move twice');
+  const est = s.crypto.filter((e) => e.est);
+  assert.equal(est.length, 1); assert.ok(est[0].qty > 0, 'accrued reward kept as an estimated reward');
+  FC.cryptoTrade(s, {side: 'sell', coin: 'BNB', qty: 0.2, usd: 180, date: FC.localISO()});
+  FC.earnAutoSync(s);
+  assert.ok(Math.abs(FC.earnSpot(s, 'BNB').free) < 1e-9 && f.qty < 0.25, 'sale taken out of Earn');
+  FC.earnAutoSet(s, 'BNB', false);
+  assert.equal(f.auto, false);
+  const pi = FC.passiveIncome(s, iso(t0), FC.localISO(new Date(Date.now() + day)));
+  assert.equal(pi.earnLei, 0, 'estimated rewards are not counted as confirmed income');
+  assert.ok(pi.earnEstimatedLei > 0);
+});

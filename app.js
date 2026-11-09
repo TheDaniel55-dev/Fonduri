@@ -2,8 +2,8 @@
 (function () {
   'use strict';
   const FC = window.FC;
-  const APP_VERSION = '1.7.0';            // aceeași cu VERSION din sw.js (verificat de teste)
-  const APP_DATE = '9 noiembrie 2026';
+  const APP_VERSION = '1.8.0';            // aceeași cu VERSION din sw.js (verificat de teste)
+  const APP_DATE = '10 noiembrie 2026';
   const KEY = 'fonduri.data.v1';
   const $app = document.getElementById('app');
 
@@ -580,10 +580,28 @@
       '<button class="btn block" data-a="page" data-p="cryptoHistory">Istoric crypto și Earn</button><div class="grid2"><button class="btn primary" data-a="sheet" data-s="earnAdd">Pun în Earn</button><button class="btn" data-a="sheet" data-s="reward">Altă recompensă</button></div>' +
       '<span class="tiny muted" style="line-height:1.5">Recompensa vine în fiecare zi. La Flexible se adaugă singură la suma din Earn și produce și ea, iar valoarea intră automat în totalul investițiilor. Dacă suma din ' + esc(EXCH()) + ' e alta, apasă pe poziție și scrie cifra reală.</span></section>' +
       (list.length ? '<div class="card tight">' + list.map((e) => '<button class="list-row" data-a="sheet" data-s="earnFix" data-id="' + e.id + '"><span class="badge" style="background:color-mix(in srgb,var(--act) 22%,transparent);color:var(--actTxt)">' + esc(e.coin.slice(0, 4)) + '</span>' +
-        '<span class="grow"><span class="t">' + qty(+e.qtyNow.toFixed(8)) + ' ' + esc(e.coin) + '</span><span class="s">' + (e.type === 'locked' ? 'Locked' + (e.daysLeft != null ? ', mai sunt ' + e.daysLeft + ' zile' : '') : 'Flexible') + ', APR ' + fmt(e.apr * 100, 2) + '%</span>' +
+        '<span class="grow"><span class="t">' + qty(+e.qtyNow.toFixed(8)) + ' ' + esc(e.coin) + '</span><span class="s">' + (e.type === 'locked' ? 'Locked' + (e.daysLeft != null ? ', mai sunt ' + e.daysLeft + ' zile' : '') : 'Flexible' + (e.auto ? ', auto-subscribe' : '')) + ', APR ' + fmt(e.apr * 100, 2) + '%</span>' +
         '<span class="s m">' + (e.valueUsd != null ? cmU(e.valueUsd) + (curSub() ? ' ' + csU(e.valueUsd) : '') : 'fără preț acum') + '</span></span>' +
         '<span class="col" style="align-items:flex-end;gap:2px"><span class="v green m">+' + qty(+e.estReward.toFixed(8)) + '</span><span class="tiny muted m">azi +' + qty(+e.todayQty.toFixed(6)) + '</span><span class="tiny muted m">' + (e.rewardUsd != null ? '≈ ' + cmU(e.rewardUsd) + ', ' : '') + e.days + ' zile</span></span></button>').join('') + '</div>'
-        : '<div class="card empty">Nimic în Earn încă.</div>');
+        : '<div class="card empty">Nimic în Earn încă.</div>') + autoCard();
+  }
+  /* Auto-subscribe pe fiecare monedă: ce ai în Spot trece singur în Earn Flexible */
+  function autoCard() {
+    const cv = FC.cryptoValue(S);
+    const coins = cv.list.map((c) => c.coin).filter((c) => c !== 'USDT' && c !== 'USDC');
+    if (cv.stableUsd > 0.009 || S.earn.some((e) => e.active !== false && (e.coin === 'USDT' || e.coin === 'USDC'))) coins.push('USDT');
+    S.earn.forEach((e) => { if (e.active !== false && e.auto && !coins.includes(e.coin) && e.coin !== 'USDC') coins.push(e.coin); });
+    if (!coins.length) return '';
+    const rows = coins.map((c) => {
+      const f = S.earn.find((e) => e.active !== false && e.auto && e.coin === c), sp = FC.earnSpot(S, c);
+      const free = Math.max(0, sp.free), name = c === 'USDT' ? 'USDT / USDC' : c;
+      const sub = f ? 'APR ' + fmt(f.apr * 100, 2) + '%, în Earn ' + qty(+sp.inEarn.toFixed(8)) + (free > 1e-9 ? ', se mută ' + qty(+free.toFixed(8)) : ', nimic liber în Spot')
+        : (free > 1e-9 ? 'liber în Spot ' + qty(+free.toFixed(8)) : 'totul e deja în Earn');
+      return '<label class="switch" style="border-top:1px solid var(--line);padding-top:6px"><span class="col" style="gap:2px;min-width:0"><b>' + esc(name) + '</b><span class="tiny muted m">' + sub + '</span></span>' +
+        '<input type="checkbox" data-a2="earnAuto" data-c="' + esc(c) + '"' + (f ? ' checked' : '') + ' aria-label="Auto-subscribe ' + esc(name) + '"></label>';
+    }).join('');
+    return '<section class="card col" style="gap:6px"><h2 style="font-size:17px">Auto-subscribe</h2>' +
+      '<span class="tiny muted" style="line-height:1.5">Pornit pe o monedă, tot ce ai din ea în Spot trece singur în Earn Flexible, la fel ca pe ' + esc(EXCH()) + '. Intră și ce cumperi de acum înainte, iar la vânzare se scoate singur.</span>' + rows + '</section>';
   }
   function savingsBody() {
     const s = S.settings.savings, bal = FC.savingsBalance(S);
@@ -1037,6 +1055,12 @@
         '<input type="hidden" name="id" value="' + esc(e.id) + '">' +
         '<button type="button" class="btn danger block" data-a="earnStop" data-id="' + e.id + '">Am scos tot din Earn</button>', 'Salvează suma reală', 'earnFix');
     }
+    if (s === 'earnAuto') {
+      const c = A.id, f = S.earn.find((e) => e.active !== false && e.type !== 'locked' && e.coin === c), sp = FC.earnSpot(S, c);
+      return formSheet('Auto-subscribe ' + (c === 'USDT' ? 'USDT / USDC' : c), '<span class="small soft" style="line-height:1.5">Mut acum în Earn Flexible ce ai liber în Spot (' + qty(+Math.max(0, sp.free).toFixed(8)) + ' ' + esc(c) + '). De acum, orice cumpărare de ' + esc(c) + ' intră singură în Earn, iar recompensa zilnică se adaugă la suma care produce.</span>' +
+        field('APR Flexible de pe ' + esc(EXCH()) + ' (%)', 'apr', f ? fmt(f.apr * 100, 2) : '', 'inputmode="decimal" required') + '<input type="hidden" name="coin" value="' + esc(c) + '">' +
+        '<span class="tiny muted">APR-ul îl vezi în ' + esc(EXCH()) + ' la Earn → Simple Earn → ' + esc(c) + '. Dacă se schimbă, îl actualizezi tot de aici.</span>', 'Pornesc auto-subscribe', 'earnAuto');
+    }
     if (s === 'reward') return formSheet('Altă recompensă (airdrop, Launchpool)', '<div class="grid2">' + field('Moneda', 'coin', '', 'autocapitalize="characters" required') + field('Cantitate primită', 'qty', '', 'inputmode="decimal" required') + '</div>' + dateField(), 'Adaugă', 'reward');
     if (s === 'earnAdd') return formSheet('Pun în Earn', '<div class="grid2">' + field('Moneda', 'coin', '', 'autocapitalize="characters" required') + field('Cantitate', 'qty', '', 'inputmode="decimal" required') + '</div>' +
       '<div class="field"><label for="f_type">Tip</label><select id="f_type" class="input" name="type"><option value="flexible">Flexible</option><option value="locked">Locked</option></select></div>' +
@@ -1156,7 +1180,7 @@
   /* ================= acțiuni ================= */
   function openSheet(name, args) { UI.sheet = name; UI.args = args || {}; UI.form = Object.assign({}, args || {}); render(); }
   function closeSheet() { UI.sheet = null; UI.args = {}; UI.add = null; UI.form = {}; render(); }
-  function commit(msg) { save(); FC.snapshot(S); save(); if (msg) toast(msg); }
+  function commit(msg) { try { FC.earnAutoSync(S); } catch (e) { /* auto-subscribe nu blochează salvarea */ } save(); FC.snapshot(S); save(); if (msg) toast(msg); }
 
   let checkingUpdate = false;
   async function checkAppUpdate(button) {
@@ -1339,6 +1363,11 @@
     },
     withdraw: (f) => { FC.cryptoWithdraw(S, { usd: num(f.usd), lei: num(f.lei), fund: f.fund.value, date: f.date.value }); closeSheet(); commit('Retragere salvată'); },
     earnFix: (f) => { FC.earnFix(S, f.id.value, num(f.qty), null, f.mode.value); closeSheet(); commit('Operațiune Earn salvată în istoric'); },
+    earnAuto: (f) => {
+      const apr = num(f.apr) / 100;
+      if (!(apr >= 0) || !f.apr.value.trim()) throw new Error('Scrie APR-ul de pe ' + EXCH() + '.');
+      FC.earnAutoSet(S, f.coin.value, true, apr); closeSheet(); commit('Auto-subscribe pornit pentru ' + f.coin.value); refreshMarket(false).then(startLive);
+    },
     reward: (f) => { FC.cryptoReward(S, { coin: f.coin.value, qty: num(f.qty), date: f.date.value }); closeSheet(); commit('Recompensă adăugată'); },
     earnAdd: (f) => {
       const apr = num(f.apr) / 100;
@@ -1724,6 +1753,10 @@
     if (k === 'pet') { FC.setPet(S, el.value); commit('Salvat'); render(); return; }
     if (k === 'bank') { FC.setBank(S, el.value); commit('Salvat'); render(); return; }
     if (k === 'exchange') { S.settings.profile.exchange = el.value.trim() || 'Binance'; commit('Salvat'); render(); return; }
+    if (k === 'earnAuto') {
+      if (el.checked) { el.checked = false; openSheet('earnAuto', { id: el.dataset.c }); return; }
+      FC.earnAutoSet(S, el.dataset.c, false); commit('Auto-subscribe oprit pentru ' + el.dataset.c + '. Ce e deja în Earn rămâne acolo.'); render(); return;
+    }
     if (k === 'eurGain') { S.settings.eurGainType = el.value; commit('Salvat'); return; }
     if (k === 'curMain' || k === 'curSub') {
       const c = S.settings.currency = Object.assign({ main: 'RON', sub: 'USD' }, S.settings.currency);
@@ -1765,7 +1798,8 @@
   /* ================= pornire ================= */
   function afterUnlock() {
     unlocked = true;
-    const a = FC.runRecurring(S), b = FC.accrueSavings(S);
+    const a = FC.runRecurring(S), b = FC.accrueSavings(S), c = FC.earnAutoSync(S);
+    if (c) toast('Auto-subscribe: Earn actualizat');
     commit(a ? a + (a === 1 ? ' plată recurentă adăugată' : ' plăți recurente adăugate') : null);
     if (b) toast('Dobânda la economii a fost adăugată');
     render();
