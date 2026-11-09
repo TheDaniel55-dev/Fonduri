@@ -60,3 +60,19 @@ test('Backup roundtrip preserves history and classification',()=>{
   assert.deepEqual(FC.cryptoHistory(reloaded),FC.cryptoHistory(s));
   assert.ok(FC.exportRows(s).Crypto.every(x=>x.Tip));
 });
+test('Crypto gain breakdown adds up to the total in lei, including fees and the dollar rate', () => {
+  const s = FC.emptyState(); s.fx.usdRon = 4.4; s.prices.SOL = {p: 150}; s.prices.BNB = {p: 900};
+  FC.cryptoDeposit(s, {usd: 100, lei: 470, refRate: 4.6, date: '2026-09-01T10:00'});
+  FC.cryptoTrade(s, {side: 'buy', coin: 'SOL', qty: 0.5, usd: 80, date: '2026-09-01T11:00'});
+  FC.cryptoTrade(s, {side: 'sell', coin: 'SOL', qty: 0.1, usd: 18, date: '2026-09-10T11:00'});
+  const b = FC.cryptoBreakdown(s), sum = Object.values(b.parts).reduce((x, v) => x + v, 0);
+  assert.ok(Math.abs(sum - b.total) < 0.05, sum + ' vs ' + b.total);
+  assert.ok(b.parts.fees < 0, 'deposit fees are a loss');
+  assert.ok(b.parts.realized > 0, 'the sale above cost is realized profit');
+  assert.ok(b.parts.fx < 0, 'the dollar fell from 4,6 to 4,4 lei');
+});
+test('Display currencies default to lei with dollars below and survive backups', () => {
+  assert.deepEqual(FC.emptyState().settings.currency, {main: 'RON', sub: 'USD'});
+  const restored = FC.validateBackup({tx: [], settings: {currency: {main: 'USD'}}});
+  assert.deepEqual(restored.settings.currency, {main: 'USD', sub: 'USD'});
+});

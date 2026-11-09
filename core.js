@@ -50,7 +50,8 @@
       monthStart: 1,                       // ziua din lună de la care începe luna ta financiară
       theme: { accent: 'mov', bg: 'denim', size: 'normal' },
       startTab: 'home',
-      homeRange: 90
+      homeRange: 90,
+      currency: { main: 'RON', sub: 'USD' }   // cum se afișează sumele din Investiții: valuta principală + una mai mică dedesubt ('' = fără)
     };
   }
 
@@ -398,6 +399,23 @@
       netInvestedLei: r2(netInvestedLei), realPlLei: r2(valueLei - netInvestedLei),
       fees: rp.fees, missing, rate
     };
+  }
+
+  /* De unde vine plusul sau minusul din crypto, în lei la cursul de azi. Părțile adunate dau exact câștigul total.
+     price: cât au urcat sau coborât monedele pe care le ai, față de cât te-au costat (cu fee-urile de tranzacționare)
+     earn: valoarea recompenselor Earn (au cost zero)
+     realized: profitul sau pierderea din ce ai vândut deja
+     fees: comisioanele plătite la depunere (marja băncii, fee-ul cardului)
+     fx: restul — schimbarea cursului dolarului față de ziua depunerii și corecturile manuale */
+  function cryptoBreakdown(state) {
+    const cv = cryptoValue(state), rate = cv.rate;
+    let earnUsd = 0;
+    cv.list.forEach((c) => { if (c.price != null && c.earnQty > 0) earnUsd += Math.min(c.earnQty, c.qty) * c.price; });
+    const depFees = cv.fees.filter((f) => f.type !== 'Fee tranzacționare').reduce((x, f) => x + (f.lei || 0), 0);
+    const parts = { price: (cv.unrealizedUsd - earnUsd) * rate, earn: earnUsd * rate, realized: cv.realizedUsd * rate, fees: -depFees };
+    parts.fx = cv.realPlLei - parts.price - parts.earn - parts.realized - parts.fees;
+    Object.keys(parts).forEach((k) => { parts[k] = r2(parts[k]); });
+    return { total: cv.realPlLei, invested: cv.netInvestedLei, pct: cv.netInvestedLei > 0 ? cv.realPlLei / cv.netInvestedLei : 0, parts, rate };
   }
 
   /* ---------- Earn ---------- */
@@ -1031,6 +1049,7 @@
     st.settings.live = Object.assign(defaultSettings().live, (obj.settings || {}).live || {});
     st.settings.theme = Object.assign(defaultSettings().theme, (obj.settings || {}).theme || {});
     st.settings.profile = Object.assign(defaultSettings().profile, (obj.settings || {}).profile || {});
+    st.settings.currency = Object.assign(defaultSettings().currency, (obj.settings || {}).currency || {});
     if (st.tx.length || st.crypto.length) st.settings.setupDone = true;   // are deja date: nu mai arătăm ecranul de început
     if (!Array.isArray(st.goals)) st.goals = [];
     if (!st.hist || typeof st.hist !== 'object') st.hist = {};
@@ -1082,7 +1101,7 @@
     earnAdd, earnLog, rewardNeedsReview, classifyReward, cryptoHistory, cryptoEventLabel, earnSummary, savingsDeposit, savingsWithdraw, savingsBalance, accrueSavings,
     runRecurring, periodStats, monthRange, monthsBack, feeReport, isExpense,
     netWorth, snapshot, worthSeries, validateBackup, exportRows, kindLabel,
-    exName, setPet, setBank, savingsSetup, passiveIncome, passiveYearEstimate, fundSetBalance, cryptoFix, cryptoFixStable, cryptoFixInvested, interestBetween, earnAccrued, earnFix, earnStop, setInterestReal, savingsNext, finYM, availableFunds, fundSeries, savingsReport, investReport, coinsEver, portfolioSeries, goalProgress, paceCompare
+    exName, cryptoBreakdown, setPet, setBank, savingsSetup, passiveIncome, passiveYearEstimate, fundSetBalance, cryptoFix, cryptoFixStable, cryptoFixInvested, interestBetween, earnAccrued, earnFix, earnStop, setInterestReal, savingsNext, finYM, availableFunds, fundSeries, savingsReport, investReport, coinsEver, portfolioSeries, goalProgress, paceCompare
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = FC;
   else root.FC = FC;

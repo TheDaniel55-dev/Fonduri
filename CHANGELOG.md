@@ -1,5 +1,14 @@
 # Change Log — Fonduri
 
+## 1.7.0 · 9 noiembrie 2026
+### Salvează direct din tastatură
+La Tranzacție nouă, butonul Salvează ocupă ultima coloană a tastaturii și arată suma introdusă. Butonul rămâne vizibil fără derulare la cheltuieli, venituri, retrageri din fond și mutări.
+Nota și data sunt pe un singur rând sub tastatură. Data apare scurt, de exemplu „Azi, 14:30”. La atingere se deschide selectorul de dată al telefonului. Pe ecranele mici, tastele și spațiile sunt puțin mai compacte.
+### Un singur câștig total la crypto
+Cardul crypto afișează câștigul total față de banii depuși, în locul celor două valori separate în lei și dolari. Secțiunea „De unde vine” împarte câștigul în prețul monedelor, recompensele Earn, vânzările încasate, comisioanele la depunere și efectul cursului dolarului cu corecturile manuale. Componentele adunate dau totalul.
+### Valută principală și secundară
+Setări → Valute în Investiții permite alegerea valutei principale și a celei secundare: lei, dolari sau euro. Valuta secundară poate fi dezactivată. Alegerea se aplică la raport, crypto, Earn și economii, la cursul BCE din ziua curentă. Cursul euro se descarcă împreună cu cel al dolarului. Backupurile vechi pornesc cu lei ca valută principală și dolari ca valută secundară.
+
 ## 1.6.3 · 5 noiembrie 2026
 ### Tastatura rămâne pe loc la venituri
 Împărțirea între fonduri are spațiu rezervat înainte să introduci prima cifră. Dacă ai multe fonduri, poți derula în interiorul împărțirii.
