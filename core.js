@@ -51,7 +51,7 @@
       theme: { accent: 'mov', bg: 'denim', size: 'normal' },
       startTab: 'home',
       homeRange: 90,
-      currency: { main: 'RON', sub: 'USD' }   // cum se afișează sumele din Investiții: valuta principală + una mai mică dedesubt ('' = fără)
+      currency: { main: 'RON', sub: 'USD', zones: {} }   // cum se afișează sumele din Investiții: principală + una mai mică ('' = fără); zones: crypto / savings cu valuta lor
     };
   }
 
@@ -291,6 +291,59 @@
     if (!coin || !(qty > 0)) throw new Error('Scrie moneda și cantitatea primită.');
     const e = { id: uid(), kind: 'reward', date: p.date || localISO(), coin, qty, note: p.note || 'Earn' };
     state.crypto.push(e); return e;
+  }
+
+  /* Modifici sau ștergi o cumpărare, vânzare, depunere ori retragere din istoric.
+     Dacă schimbarea lasă o vânzare fără monede sau Earn-ul fără acoperire, nu se salvează nimic. */
+  const EDITABLE = ['trade', 'deposit', 'withdraw'];
+  function cryptoCheck(state) {
+    const ev = state.crypto.slice().sort(byDate);
+    ev.forEach((e) => {
+      if (e.kind !== 'trade' || e.side !== 'sell') return;
+      // ce aveai chiar înainte de vânzare (replay-ul pune la 0 soldurile negative, așa că o scoatem pe ea)
+      const before = cryptoReplay(Object.assign({}, state, { crypto: ev.filter((x) => x !== e && x.date <= e.date) }), e.date).coins[e.coin];
+      const have = before ? before.qty : 0;
+      if (have + 1e-9 < e.qty) throw new Error('Vânzarea de ' + e.coin + ' din ' + e.date.slice(0, 10).split('-').reverse().join('.') + ' ar rămâne fără monede (ar lipsi ' + +(e.qty - have).toFixed(8) + ' ' + e.coin + '). Modifică sau șterge întâi vânzarea.');
+    });
+    const rp = cryptoReplay(state), seen = {};
+    state.earn.filter((x) => x.active !== false && !x.auto).forEach((x) => {
+      const g = STABLES.includes(x.coin) ? 'USD' : x.coin;
+      if (seen[g]) return; seen[g] = 1;
+      const total = g === 'USD' ? rp.stableUsd + STABLES.reduce((a, c) => a + (rp.coins[c] ? rp.coins[c].qty : 0), 0) : (rp.coins[g] ? rp.coins[g].qty : 0);
+      const res = state.earn.filter((y) => y.active !== false && !y.auto && (g === 'USD' ? STABLES.includes(y.coin) : y.coin === g)).reduce((a, y) => a + y.qty, 0);
+      if (res > total + 1e-9) throw new Error('Ai ' + +res.toFixed(8) + ' ' + x.coin + ' în Earn, dar ar rămâne doar ' + +Math.max(0, total).toFixed(8) + ' în portofoliu. Scoate întâi din Earn sau corectează poziția.');
+    });
+  }
+  function cryptoUndoable(state, f) {
+    const keep = { crypto: state.crypto.slice(), tx: state.tx.slice(), earn: JSON.parse(JSON.stringify(state.earn)) };
+    try { const r = f(); cryptoCheck(state); return r; }
+    catch (err) { state.crypto = keep.crypto; state.tx = keep.tx; state.earn = keep.earn; throw err; }
+  }
+  function cryptoDeleteEvent(state, id) {
+    const e = state.crypto.find((x) => x.id === id);
+    if (!e || EDITABLE.indexOf(e.kind) < 0) throw new Error('Operațiunea nu se poate șterge de aici.');
+    return cryptoUndoable(state, () => {
+      state.crypto = state.crypto.filter((x) => x.id !== id);
+      state.tx = state.tx.filter((t) => !(t.src === 'crypto' && t.link === id));
+      return e;
+    });
+  }
+  function cryptoEditEvent(state, id, p) {
+    const old = state.crypto.find((x) => x.id === id);
+    if (!old || EDITABLE.indexOf(old.kind) < 0) throw new Error('Operațiunea nu se poate modifica de aici.');
+    return cryptoUndoable(state, () => {
+      const oldTx = state.tx.find((t) => t.src === 'crypto' && t.link === id);
+      state.crypto = state.crypto.filter((x) => x.id !== id);
+      state.tx = state.tx.filter((t) => !(t.src === 'crypto' && t.link === id));
+      const q = Object.assign({ note: old.note }, p);
+      if (old.kind === 'trade' && old.feeQty && old.feeUsd && !q.bnbPrice) q.bnbPrice = old.feeUsd / old.feeQty;   // fee-ul în BNB la prețul de atunci
+      if (old.kind === 'withdraw' && !q.fund) q.fund = old.fund;
+      const e = old.kind === 'trade' ? cryptoTrade(state, q) : old.kind === 'deposit' ? cryptoDeposit(state, q) : cryptoWithdraw(state, q);
+      const t = state.tx.find((x) => x.src === 'crypto' && x.link === e.id);
+      e.id = id; e.edited = localISO();
+      if (t) { t.link = id; if (oldTx) t.id = oldTx.id; }
+      return e;
+    });
   }
 
   /* Reface tot portofoliul din evenimente: cost mediu în $ și în lei (cu toate fee-urile incluse). */
@@ -1112,6 +1165,8 @@
     st.settings.theme = Object.assign(defaultSettings().theme, (obj.settings || {}).theme || {});
     st.settings.profile = Object.assign(defaultSettings().profile, (obj.settings || {}).profile || {});
     st.settings.currency = Object.assign(defaultSettings().currency, (obj.settings || {}).currency || {});
+    const zs = st.settings.currency.zones; st.settings.currency.zones = {};
+    if (zs && typeof zs === 'object') ['crypto', 'savings'].forEach((z) => { if (zs[z] && /^(RON|USD|EUR)$/.test(zs[z].main)) st.settings.currency.zones[z] = { main: zs[z].main, sub: /^(RON|USD|EUR)?$/.test(zs[z].sub || '') ? (zs[z].sub || '') : '' }; });
     if (st.tx.length || st.crypto.length) st.settings.setupDone = true;   // are deja date: nu mai arătăm ecranul de început
     if (!Array.isArray(st.goals)) st.goals = [];
     if (!st.hist || typeof st.hist !== 'object') st.hist = {};
@@ -1159,7 +1214,7 @@
     defaultSettings, emptyState, uid, r2, pad, localISO, dayOf, monthOf, byDate,
     balances, fundsTotal, incomeAlloc, makeTx, addTx, updateTx, deleteTx,
     cashSummary, addCash, exchangeEur,
-    cryptoDeposit, cryptoTrade, cryptoWithdraw, cryptoReward, cryptoReplay, cryptoValue,
+    cryptoDeposit, cryptoTrade, cryptoWithdraw, cryptoReward, cryptoEditEvent, cryptoDeleteEvent, cryptoCheck, cryptoReplay, cryptoValue,
     earnAdd, earnLog, rewardNeedsReview, classifyReward, cryptoHistory, cryptoEventLabel, earnSummary, savingsDeposit, savingsWithdraw, savingsBalance, accrueSavings,
     runRecurring, periodStats, monthRange, monthsBack, feeReport, isExpense,
     netWorth, snapshot, worthSeries, validateBackup, exportRows, kindLabel,

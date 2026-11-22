@@ -1,5 +1,14 @@
 # Change Log — Fonduri
 
+## 1.9.0 · 22 noiembrie 2026
+### Prețul monedelor foarte ieftine
+Prețul pe bucată se afișează cu destule zecimale și la monedele de fracțiuni de cent, de exemplu 0,000003463 $ în loc de 0,0000 $. Regula se aplică în formularul de cumpărare și vânzare, la detaliile fiecărei monede și în graficul ei. Sumele de peste un dolar rămân cu două zecimale.
+### Valută separată pentru crypto și economii
+În Setări → Valute în Investiții alegi separat valuta pentru Total și Raport, pentru Crypto și Earn și pentru contul de economii. De exemplu, crypto în dolari și economiile în lei. O zonă lăsată pe „Ca la total” urmează valuta generală. În Raport, blocul fiecărei investiții folosește valuta zonei lui. Setările vechi rămân valabile pentru toate zonele.
+### Modifici sau ștergi operațiunile crypto din istoric
+În Istoric crypto și Earn, cumpărările, vânzările, depunerile și retragerile au butoanele Modifică și Șterge. Modificarea deschide formularul completat și înlocuiește operațiunea veche, iar depunerile și retragerile își actualizează și mișcarea din fonduri. Operațiunea modificată arată data modificării.
+Dacă schimbarea ar lăsa o vânzare ulterioară fără monede sau o poziție Earn fără acoperire, nu se salvează nimic și primești un mesaj cu ce lipsește. Ștergerea unei depuneri crypto din lista de tranzacții trece prin aceeași verificare. Auto-subscribe ajustează Earn-ul după modificare.
+
 ## 1.8.0 · 10 noiembrie 2026
 ### Auto-subscribe pe fiecare monedă în Earn
 În Investiții → Earn, cardul Auto-subscribe are un comutator pentru fiecare monedă din portofoliu, iar USDT și USDC apar împreună. La pornire introduci APR-ul Flexible. Tot ce e liber în Spot din moneda respectivă trece imediat în Earn Flexible. Cumpărările următoare intră automat, iar vânzările se scot automat din Earn.

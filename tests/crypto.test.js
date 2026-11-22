@@ -72,9 +72,37 @@ test('Crypto gain breakdown adds up to the total in lei, including fees and the 
   assert.ok(b.parts.fx < 0, 'the dollar fell from 4,6 to 4,4 lei');
 });
 test('Display currencies default to lei with dollars below and survive backups', () => {
-  assert.deepEqual(FC.emptyState().settings.currency, {main: 'RON', sub: 'USD'});
+  assert.deepEqual(FC.emptyState().settings.currency, {main: 'RON', sub: 'USD', zones: {}});
   const restored = FC.validateBackup({tx: [], settings: {currency: {main: 'USD'}}});
-  assert.deepEqual(restored.settings.currency, {main: 'USD', sub: 'USD'});
+  assert.deepEqual(restored.settings.currency, {main: 'USD', sub: 'USD', zones: {}});
+  const z = FC.validateBackup({tx: [], settings: {currency: {main: 'RON', sub: 'USD', zones: {crypto: {main: 'USD', sub: 'RON'}, savings: {main: 'XYZ'}, evil: {main: 'USD'}}}}});
+  assert.deepEqual(z.settings.currency.zones, {crypto: {main: 'USD', sub: 'RON'}}, 'only known zones and currencies survive');
+});
+test('A crypto buy can be edited or deleted from history, keeping later sales and Earn covered', () => {
+  const s = FC.emptyState(); s.fx.usdRon = 4.4; s.prices.BNB = {p: 900};
+  const dep = FC.cryptoDeposit(s, {usd: 100, lei: 470, refRate: 4.6, date: '2026-09-01T10:00'});
+  const wrong = FC.cryptoTrade(s, {side: 'buy', coin: 'PEPE', qty: 1415113.57, usd: 4.9, date: '2026-09-02T10:00'});
+  FC.cryptoTrade(s, {side: 'buy', coin: 'PEPE', qty: 1400000, usd: 5.2, date: '2026-09-02T10:05'});
+  FC.cryptoEditEvent(s, wrong.id, {side: 'buy', coin: 'PEPE', qty: 1000000, usd: 3.5, date: '2026-09-02T10:00'});
+  const ed = s.crypto.find((e) => e.id === wrong.id);
+  assert.equal(ed.qty, 1000000); assert.equal(ed.usd, 3.5); assert.ok(ed.edited);
+  assert.equal(s.crypto.length, 3, 'edit replaces, never duplicates');
+  FC.cryptoTrade(s, {side: 'sell', coin: 'PEPE', qty: 2000000, usd: 7, date: '2026-09-05T10:00'});
+  assert.throws(() => FC.cryptoDeleteEvent(s, wrong.id), /fără monede/);
+  assert.equal(s.crypto.length, 4, 'a refused delete changes nothing');
+  assert.throws(() => FC.cryptoEditEvent(s, wrong.id, {side: 'buy', coin: 'PEPE', qty: 1, usd: 1, date: '2026-09-02T10:00'}), /fără monede/);
+  assert.equal(s.crypto.find((e) => e.id === wrong.id).qty, 1000000, 'a refused edit keeps the old values');
+  const lei = s.tx.find((t) => t.link === dep.id).amount;
+  FC.cryptoEditEvent(s, dep.id, {usd: 100, lei: 480, date: '2026-09-01T10:00'});
+  const tx = s.tx.filter((t) => t.link === dep.id);
+  assert.equal(tx.length, 1, 'one linked fund transaction'); assert.equal(tx[0].amount, 480); assert.notEqual(lei, 480);
+  // Earn manual nu poate rămâne fără acoperire
+  const s2 = FC.emptyState(); s2.fx.usdRon = 4.4;
+  FC.cryptoDeposit(s2, {usd: 500, lei: 2300, refRate: 4.6, date: '2026-09-01T10:00'});
+  const b = FC.cryptoTrade(s2, {side: 'buy', coin: 'SOL', qty: 2, usd: 300, date: '2026-09-01T11:00'});
+  FC.earnAdd(s2, {coin: 'SOL', qty: 2, type: 'flexible', apr: 0.05, start: '2026-09-02'});
+  assert.throws(() => FC.cryptoDeleteEvent(s2, b.id), /în Earn/);
+  assert.equal(s2.crypto.filter((e) => e.kind === 'trade').length, 1, 'the buy is still there');
 });
 test('Auto-subscribe moves new purchases into Flexible Earn and back out on sales, without changing holdings', () => {
   const s = FC.emptyState(); s.fx.usdRon = 4.4; s.prices.BNB = {p: 900};
