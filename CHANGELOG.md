@@ -1,5 +1,11 @@
 # Change Log — Fonduri
 
+## 1.10.0 · 22 noiembrie 2026
+### Setări din orice ecran
+Iconița de setări apare acum pe toate ecranele: Acasă, Fonduri, Investiții, Statistici, Istoric și Istoric crypto și Earn. Butonul Înapoi din Setări te întoarce în ecranul din care ai venit.
+### Setările potrivite ecranului, primele
+Când deschizi Setările dintr-un ecran, sus apar întâi grupurile care țin de el, sub titlul „Pentru …”, apoi restul. De exemplu, din Crypto vezi întâi Crypto și exchange-ul, apoi Valute în Investiții. Din Economii vezi întâi contul de economii, iar din Statistici categoriile și luna financiară. Butonul „Arată în ordinea obișnuită” revine la lista completă, în ordinea de dinainte.
+
 ## 1.9.0 · 22 noiembrie 2026
 ### Prețul monedelor foarte ieftine
 Prețul pe bucată se afișează cu destule zecimale și la monedele de fracțiuni de cent, de exemplu 0,000003463 $ în loc de 0,0000 $. Regula se aplică în formularul de cumpărare și vânzare, la detaliile fiecărei monede și în graficul ei. Sumele de peste un dolar rămân cu două zecimale.

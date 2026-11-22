@@ -153,6 +153,9 @@ body.discreet .m{filter:blur(9px);transition:filter .2s}
 .ask-box p{margin:0;font-size:15px;line-height:1.5}
 
 /* ---------- setări pe secțiuni ---------- */
+.stats-seg button{min-width:56px}
+@media (max-width:359px){.stats-seg button{min-width:0;padding-inline:12px}}
+.sec-t{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.02em;padding:6px 4px 0}
 details.set>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;min-height:44px;color:var(--txt)}
 details.set>summary::-webkit-details-marker{display:none}
 details.set>summary svg{transition:transform .2s;color:var(--muted);flex-shrink:0}

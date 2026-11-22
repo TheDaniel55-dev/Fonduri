@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const FC = window.FC;
-  const APP_VERSION = '1.9.0';            // aceeași cu VERSION din sw.js (verificat de teste)
+  const APP_VERSION = '1.10.0';            // aceeași cu VERSION din sw.js (verificat de teste)
   const APP_DATE = '22 noiembrie 2026';
   const KEY = 'fonduri.data.v1';
   const $app = document.getElementById('app');
@@ -350,7 +350,7 @@
       Object.keys(t.alloc || {}).forEach((f) => { if (!flows[f]) return; const v = t.alloc[f]; if (v > 0) flows[f].in += v; else flows[f].out -= v; });
     });
     return '<main class="screen">' +
-      '<header class="row between"><h1>Fonduri</h1><button class="icon-btn" data-a="page" data-p="settings" aria-label="Setări procente">' + ic('gear', 20) + '</button></header>' +
+      '<header class="row between"><h1>Fonduri</h1><button class="icon-btn" data-a="page" data-p="settings" aria-label="Setări">' + ic('gear', 20) + '</button></header>' +
       '<div class="grid2">' +
       '<div class="card col" style="gap:3px;padding:14px 16px"><span class="tiny muted">Total fonduri</span><span class="disp m" style="font-size:22px;font-weight:600">' + fmt(Math.round(total)) + ' <span class="small muted">lei</span></span><span class="tiny soft">' + FUNDS().length + ' fonduri, cash inclus</span></div>' +
       '<button class="card col" data-a="invSeg" data-v="report" style="border:0;text-align:left;color:var(--txt);gap:3px;padding:14px 16px"><span class="tiny muted">Total investiții</span><span class="disp m" style="font-size:22px;font-weight:600">' + fmt(Math.round(ir.value)) + ' <span class="small muted">lei</span></span><span class="tiny m ' + (ir.pl >= 0 ? 'green' : 'red') + '">' + sign(Math.round(ir.pl)) + ' lei (' + sign(ir.plPct * 100, (n) => fmt(n, 1)) + '%)</span></button></div>' +
@@ -409,7 +409,7 @@
     else if (UI.invSeg === 'earn') body = inZone('crypto', earnBody);
     else body = inZone('savings', savingsBody);
     return '<main class="screen"><header class="row between"><h1>Investiții</h1>' +
-      (UI.invSeg !== 'savings' ? '<button class="icon-btn" data-a="refresh" aria-label="Actualizează prețurile">' + ic('refresh', 20) + '</button>' : '') + '</header>' + head + seg + body + '</main>';
+      '<div class="row" style="gap:8px">' + (UI.invSeg !== 'savings' ? '<button class="icon-btn" data-a="refresh" aria-label="Actualizează prețurile">' + ic('refresh', 20) + '</button>' : '') + '<button class="icon-btn" data-a="page" data-p="settings" aria-label="Setări">' + ic('gear', 20) + '</button>' + '</div></header>' + head + seg + body + '</main>';
   }
   /* --- raport: cât ai băgat, cât valorează, pe plus sau pe minus --- */
   function reportBody(ir) {
@@ -657,8 +657,8 @@
     const max = Math.max(1, ...mdata.map((x) => Math.max(x.i, x.e)));
     const fr = FC.feeReport(S);
     const feeKeys = Object.keys(fr.byMonth).sort().slice(-6);
-    return '<main class="screen"><header class="row between"><h1>Statistici</h1><div class="seg" style="grid-template-columns:1fr 1fr">' +
-      [['luna', 'Lună'], ['an', 'An']].map((x) => '<button class="' + (UI.statsMode === x[0] ? 'on' : '') + '" data-a="statsMode" data-v="' + x[0] + '" style="min-width:56px">' + x[1] + '</button>').join('') + '</div></header>' +
+    return '<main class="screen"><header class="row between" style="flex-wrap:wrap;row-gap:8px"><h1>Statistici</h1><div class="row" style="gap:8px;margin-left:auto"><div class="seg stats-seg" style="grid-template-columns:1fr 1fr">' +
+      [['luna', 'Lună'], ['an', 'An']].map((x) => '<button class="' + (UI.statsMode === x[0] ? 'on' : '') + '" data-a="statsMode" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div>' + '<button class="icon-btn" data-a="page" data-p="settings" aria-label="Setări">' + ic('gear', 20) + '</button>' + '</div></header>' +
       '<div class="row between"><button class="icon-btn" data-a="statsNav" data-d="-1" aria-label="Perioada anterioară">' + ic('left', 20) + '</button><span class="disp" style="font-size:18px;font-weight:600">' + label + '</span><button class="icon-btn" data-a="statsNav" data-d="1" aria-label="Perioada următoare">' + ic('right', 20) + '</button></div>' +
       (UI.statsCat ? '<button class="chip on" data-a="statsCat" data-c="">' + esc(UI.statsCat) + ' ' + ic('close', 14, 2) + '</button>' : '') +
       '<div class="grid2">' +
@@ -716,7 +716,7 @@
   function cryptoHistoryPage() {
     const query = UI.histQ.trim().toLowerCase();
     const events = FC.cryptoHistory(S).filter((e) => !query || [FC.cryptoEventLabel(e), e.coin, e.date, e.note].join(' ').toLowerCase().includes(query));
-    return '<main class="screen"><button class="link" data-a="page" data-p="">Înapoi</button><h1>Istoric crypto și Earn</h1><p class="small muted">Operațiuni salvate, inclusiv corecturi. Pentru backupurile vechi afișăm doar informațiile existente, fără a inventa intrări sau retrageri.</p><label class="field">Caută moneda, operațiunea sau data<input id="q" class="input" type="search" data-bind="histQ" data-live="1" value="' + esc(UI.histQ) + '"></label>' +
+    return '<main class="screen"><div class="row between"><button class="link row" data-a="page" data-p="" style="gap:2px">' + ic('back', 18, 2) + 'Înapoi</button>' + '<button class="icon-btn" data-a="page" data-p="settings" aria-label="Setări">' + ic('gear', 20) + '</button>' + '</div><h1>Istoric crypto și Earn</h1><p class="small muted">Operațiuni salvate, inclusiv corecturi. Pentru backupurile vechi afișăm doar informațiile existente, fără a inventa intrări sau retrageri.</p><label class="field">Caută moneda, operațiunea sau data<input id="q" class="input" type="search" data-bind="histQ" data-live="1" value="' + esc(UI.histQ) + '"></label>' +
       (events.length ? events.map((e) => '<section class="card col"><b>' + esc(FC.cryptoEventLabel(e)) + ' · ' + esc(e.coin || 'USD / lei') + '</b><span class="small muted">' + esc(e.date || '') + '</span>' +
         (e.qty != null ? kv('Cantitate', qty(e.qty)) : '') + (e.usd != null ? kv('Sumă $', usd(e.usd)) : '') + (e.lei != null ? kv('Lei', lei(e.lei, 2)) : '') +
         (e.costUsd != null ? kv('Cost total corectat', usd(e.costUsd)) : '') + (e.feeUsd != null ? kv('Comision', usd(e.feeUsd)) : '') +
@@ -781,7 +781,7 @@
     const groups = [];
     list.slice(0, 400).forEach((t) => { const d = FC.dayOf(t.date); let g = groups[groups.length - 1]; if (!g || g.d !== d) { g = { d, items: [], sum: 0 }; groups.push(g); } g.items.push(t); if (FC.isExpense(t)) g.sum += t.amount; });
     const total = list.filter(FC.isExpense).reduce((s, t) => s + t.amount, 0);
-    return '<main class="screen"><header class="col" style="gap:4px"><button class="link row" data-a="page" data-p="" style="gap:2px;align-self:flex-start">' + ic('back', 18, 2) + 'Înapoi</button><h1>Istoric</h1></header>' +
+    return '<main class="screen"><header class="col" style="gap:4px"><div class="row between"><button class="link row" data-a="page" data-p="" style="gap:2px">' + ic('back', 18, 2) + 'Înapoi</button>' + '<button class="icon-btn" data-a="page" data-p="settings" aria-label="Setări">' + ic('gear', 20) + '</button>' + '</div><h1>Istoric</h1></header>' +
       '<div class="field"><label for="q">Caută</label><input id="q" class="input" type="search" placeholder="Lidl, salariu' + (S.settings.profile.pet ? ', ' + esc(S.settings.profile.pet) : '') + '" value="' + esc(UI.histQ) + '" data-bind="histQ" data-live="1"></div>' +
       '<div class="chips" role="group" aria-label="Filtre">' + [['all', 'Toate'], ['exp', 'Cheltuieli'], ['inc', 'Venituri'], ['pas', 'Venit pasiv'], ['tr', 'Mutări'], ['inv', 'Investiții']].map((x) => '<button class="chip ' + (F === x[0] ? 'on' : '') + '" data-a="histF" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div>' +
       '<div class="chips">' + S.settings.categories.map((c) => '<button class="chip ' + (C === c ? 'on' : '') + '" data-a="histCat" data-v="' + esc(c) + '">' + esc(c) + '</button>').join('') + '</div>' +
@@ -807,6 +807,23 @@
   }
 
   /* ================= PAGINĂ: Setări ================= */
+  /* Setările deschise dintr-un ecran arată întâi ce ține de ecranul acela, apoi restul. */
+  const SET_CTX = {
+    home: { name: 'Acasă', ids: ['home', 'funds', 'priv', 'look', 'sc'] },
+    funds: { name: 'Fonduri', ids: ['funds', 'inc', 'cash', 'rec', 'cat'] },
+    report: { name: 'Raport', ids: ['cur', 'crypto', 'sav'] },
+    crypto: { name: 'Crypto', ids: ['crypto', 'cur'] },
+    earn: { name: 'Earn', ids: ['crypto', 'cur'] },
+    savings: { name: 'Economii', ids: ['sav', 'cur'] },
+    stats: { name: 'Statistici', ids: ['cat', 'month', 'inc'] },
+    history: { name: 'Istoric', ids: ['cat', 'funds', 'rec'] },
+    cryptoHistory: { name: 'Istoric crypto', ids: ['crypto', 'cur'] }
+  };
+  function setContext() {
+    if (UI.page === 'history' || UI.page === 'cryptoHistory') return UI.page;
+    if (UI.tab === 'invest') return UI.invSeg || 'report';
+    return UI.tab || 'home';
+  }
   function settingsPage() {
     const s = S.settings;
     const pct = (v) => Math.round((v || 0) * 1000) / 10;
@@ -913,25 +930,33 @@
       '<label class="btn block" style="cursor:pointer">' + ic('upload', 18, 2) + 'Importă un fișier<input type="file" accept=".json,application/json" data-a2="import" hidden></label>' +
       '<button class="btn danger block" data-a="wipe">Șterge toate datele</button>';
 
-    return '<main class="screen"><header class="col" style="gap:4px"><button class="link row" data-a="page" data-p="" style="gap:2px;align-self:flex-start">' + ic('back', 18, 2) + 'Înapoi</button><h1>Setări</h1></header>' +
-      grp('prof', 'Profil', [s.name, P.pet, P.bank, P.exchange].filter(Boolean).map(esc).join(', ') || 'nume, animal, bancă, exchange', profBody) +
-      grp('funds', 'Fonduri', act.length + ' active', fundsBody) +
-      grp('inc', 'Venituri și împărțire', INC().join(', '), incBody) +
-      grp('cat', 'Categorii', s.categories.length + ' categorii', catBody) +
-      grp('cash', 'Pușculița', 'ordinea fondurilor, bancnote, curs euro', cashBody) +
-      grp('cur', 'Valute în Investiții', ['all', 'crypto', 'savings'].map((z) => inZone(z, () => CURRENCIES[curMain()].s + (curSub() ? ' / ' + CURRENCIES[curSub()].s : ''))).join(' · ').replace(/^(.*) · (.*) · (.*)$/, 'Total $1, crypto $2, economii $3'), curBody) +
-      grp('crypto', 'Crypto și ' + esc(EXCH()), 'prețuri live, fee-uri', cryptoBody) +
-      grp('sav', 'Economii', esc(s.savings.name), savBody) +
-      grp('rec', 'Plăți recurente', S.recurring.length + ' plăți', recBody) +
-      grp('sc', 'Scurtături', S.shortcuts.length + ' salvate', scBody) +
-      grp('home', 'Ecranul Acasă', 'bani disponibili, secțiuni', homeBody) +
-      grp('look', 'Aspect', (THEMES[th.accent] || THEMES.mov).name + ', ' + (BGS[th.bg] || BGS.denim).name + ', text ' + (SIZES[th.size] || SIZES.normal)[0].toLowerCase(), lookBody) +
-      grp('month', 'Luna financiară', (s.monthStart || 1) === 1 ? 'de pe 1 până la sfârșitul lunii' : 'începe pe ' + s.monthStart, monthBody) +
-      grp('priv', 'Confidențialitate', 'Face ID, mod discret', privBody) +
-      grp('city', 'Orașul DSL', 'sincronizare manuală prin QR', '<button class="btn primary block" data-a="syncCity">Scanează QR-ul din oraș</button><p class="small muted">Trimite portofoliul criptat prin Wi-Fi, după aprobarea cu cheia de acces. Datele din telefon rămân sursa principală.</p>' + (localStorage.getItem('fonduri.receiver.v1') ? '<button class="btn" data-a="forgetCity">Uit cheia acestui PC</button>' : '')) +
-      grp('changeLog', 'Change Log', 'Istoricul versiunilor', '<dsl-change-log></dsl-change-log>') +
-      grp('data', 'Date', 'export, import', dataBody) +
-      '<div class="row" style="justify-content:center;flex-wrap:wrap;gap:10px"><span class="tiny muted">Fonduri ' + APP_VERSION + ' · ' + APP_DATE + '</span><button class="btn" data-a="updateApp">Verifică actualizări</button></div></main>';
+    const ctx = SET_CTX[UI.setCtx] || null;
+    const all = [
+      grp('prof', 'Profil', [s.name, P.pet, P.bank, P.exchange].filter(Boolean).map(esc).join(', ') || 'nume, animal, bancă, exchange', profBody),
+      grp('funds', 'Fonduri', act.length + ' active', fundsBody),
+      grp('inc', 'Venituri și împărțire', INC().join(', '), incBody),
+      grp('cat', 'Categorii', s.categories.length + ' categorii', catBody),
+      grp('cash', 'Pușculița', 'ordinea fondurilor, bancnote, curs euro', cashBody),
+      grp('cur', 'Valute în Investiții', ['all', 'crypto', 'savings'].map((z) => inZone(z, () => CURRENCIES[curMain()].s + (curSub() ? ' / ' + CURRENCIES[curSub()].s : ''))).join(' · ').replace(/^(.*) · (.*) · (.*)$/, 'Total $1, crypto $2, economii $3'), curBody),
+      grp('crypto', 'Crypto și ' + esc(EXCH()), 'prețuri live, fee-uri', cryptoBody),
+      grp('sav', 'Economii', esc(s.savings.name), savBody),
+      grp('rec', 'Plăți recurente', S.recurring.length + ' plăți', recBody),
+      grp('sc', 'Scurtături', S.shortcuts.length + ' salvate', scBody),
+      grp('home', 'Ecranul Acasă', 'bani disponibili, secțiuni', homeBody),
+      grp('look', 'Aspect', (THEMES[th.accent] || THEMES.mov).name + ', ' + (BGS[th.bg] || BGS.denim).name + ', text ' + (SIZES[th.size] || SIZES.normal)[0].toLowerCase(), lookBody),
+      grp('month', 'Luna financiară', (s.monthStart || 1) === 1 ? 'de pe 1 până la sfârșitul lunii' : 'începe pe ' + s.monthStart, monthBody),
+      grp('priv', 'Confidențialitate', 'Face ID, mod discret', privBody),
+      grp('city', 'Orașul DSL', 'sincronizare manuală prin QR', '<button class="btn primary block" data-a="syncCity">Scanează QR-ul din oraș</button><p class="small muted">Trimite portofoliul criptat prin Wi-Fi, după aprobarea cu cheia de acces. Datele din telefon rămân sursa principală.</p>' + (localStorage.getItem('fonduri.receiver.v1') ? '<button class="btn" data-a="forgetCity">Uit cheia acestui PC</button>' : '')),
+      grp('changeLog', 'Change Log', 'Istoricul versiunilor', '<dsl-change-log></dsl-change-log>'),
+      grp('data', 'Date', 'export, import', dataBody)
+    ].map((h) => ({ id: (h.match(/data-set="([^"]+)"/) || [])[1], h }));
+    const head = '<main class="screen"><header class="col" style="gap:4px"><button class="link row" data-a="page" data-p="' + esc(UI.setBack || '') + '" style="gap:2px;align-self:flex-start">' + ic('back', 18, 2) + 'Înapoi</button><h1>Setări</h1></header>';
+    const foot = '<div class="row" style="justify-content:center;flex-wrap:wrap;gap:10px"><span class="tiny muted">Fonduri ' + APP_VERSION + ' · ' + APP_DATE + '</span><button class="btn" data-a="updateApp">Verifică actualizări</button></div></main>';
+    if (!ctx) return head + all.map((g) => g.h).join('') + foot;
+    const first = ctx.ids.map((id) => all.find((g) => g.id === id)).filter(Boolean);
+    const rest = all.filter((g) => ctx.ids.indexOf(g.id) < 0);
+    return head + '<div class="row between" style="align-items:baseline"><span class="sec-t">Pentru ' + ctx.name + '</span><button class="link small" data-a="setCtxAll">Arată în ordinea obișnuită</button></div>' + first.map((g) => g.h).join('') +
+      '<span class="sec-t">Restul setărilor</span>' + rest.map((g) => g.h).join('') + foot;
   }
   function fundEditor(f) {
     return '<div class="col" style="gap:12px;background:var(--bg);border-radius:18px;padding:14px;margin-bottom:8px">' +
@@ -1255,7 +1280,11 @@
     syncCity: () => window.startCitySync(),
     forgetCity: () => ask('Elimini cheia PC-ului de pe telefon? La următoarea scanare verifică fizic QR-ul pe PC-ul tău.', 'Uit cheia', () => { localStorage.removeItem('fonduri.receiver.v1'); render(); }),
     tab: (d) => { UI.tab = d.t; UI.page = null; render(); },
-    page: (d) => { UI.page = d.p || null; render(); },
+    setCtxAll: () => { UI.setCtx = null; render(); },
+    page: (d) => {
+      if (d.p === 'settings' && UI.page !== 'settings') { UI.setCtx = setContext(); UI.setBack = UI.page || ''; window.scrollTo(0, 0); }
+      UI.page = d.p || null; render();
+    },
     range: (d) => { UI.range = +d.v; render(); },
     repRange: (d) => { UI.repRange = d.v === 'all' ? 'all' : +d.v; render(); },
     theme: (d) => { S.settings.theme[d.k] = d.v; save(); render(); },
