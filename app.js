@@ -2,8 +2,8 @@
 (function () {
   'use strict';
   const FC = window.FC;
-  const APP_VERSION = '1.10.0';            // aceeași cu VERSION din sw.js (verificat de teste)
-  const APP_DATE = '22 noiembrie 2026';
+  const APP_VERSION = '1.11.0';            // aceeași cu VERSION din sw.js (verificat de teste)
+  const APP_DATE = '23 noiembrie 2026';
   const KEY = 'fonduri.data.v1';
   const $app = document.getElementById('app');
 
@@ -617,7 +617,7 @@
     const s = S.settings.savings, bal = FC.savingsBalance(S);
     if (!S.savings.length) return '<section class="card col" style="gap:12px;border-radius:28px;padding:20px"><span class="disp" style="font-size:20px;font-weight:600">Configurează contul de economii</span>' +
       '<span class="small soft" style="line-height:1.5">Spune-mi în ce zi primești dobânda, de când ai contul, cât ai depus și câtă dobândă ai primit până acum. De acolo aplicația calculează singură, zi de zi, cât câștigi.</span>' +
-      '<button class="btn primary block" data-a="sheet" data-s="savSetup">Configurez contul</button></section>';
+      '<button class="btn primary block" data-a="sheet" data-s="savSetup">Configurez contul</button><button class="btn block" data-a="savCalc">' + ic('stats', 18) + 'Încearcă calculatorul de dobândă</button></section>';
     const proj = (yrs) => bal * Math.pow(1 + s.apr * (1 - s.tax) / 12, yrs * 12);
     const nx = FC.savingsNext(S);
     const sd = new Date(nx.since + 'T12:00'), nd = new Date(nx.date + 'T12:00');
@@ -633,7 +633,8 @@
       '<span class="m green" style="font-size:26px;font-weight:600">+' + cm(nx.accrued, 2) + '</span>' +
       '<span class="tiny soft m">azi încă +' + cm(nx.daily, 4) + '. Pe ' + nd.getDate() + ' ' + MONTHS[nd.getMonth()] + ' primești ≈ ' + cm(nx.estNext, 2) + ' net</span></div>' +
       '<div class="grid3"><div class="col"><span class="tiny muted">Primit în 12 luni</span><span class="m green" style="font-weight:600">+' + cm(last12, 2) + '</span></div><div class="col"><span class="tiny muted">Peste 1 an</span><span class="m" style="font-weight:600">' + cm(proj(1), 0) + '</span></div><div class="col"><span class="tiny muted">Peste 5 ani</span><span class="m" style="font-weight:600">' + cm(proj(5), 0) + '</span></div></div>' +
-      '<div class="grid3"><button class="btn primary" data-a="sheet" data-s="savDep">Depun</button><button class="btn" data-a="sheet" data-s="savWd">Retrag</button><button class="btn" data-a="sheet" data-s="savSet">Corectez</button></div>' +
+      '<div class="grid3"><button class="btn primary" data-a="sheet" data-s="savDep">Depun</button><button class="btn" data-a="sheet" data-s="savWd">Retrag</button><button class="btn" data-a="sheet" data-s="savSet">Corectez</button></div' +
+      '<button class="btn block" data-a="savCalc">' + ic('stats', 18) + 'Calculator de dobândă</button>' +
       '<span class="tiny muted" style="line-height:1.5">Plata apare singură în ziua ei, ca estimare.' + (pendingEst ? ' Când vezi suma reală în aplicația băncii, apasă pe ea în listă și scrie cifra.' : '') + ' Proiecția nu include depunerile viitoare. <button class="link" data-a="sheet" data-s="savSetup" style="min-height:0;font-size:inherit">Reconfigurez contul</button></span></section>' +
       '<div class="card tight">' + ev.map((e) => {
         const isInt = e.kind === 'interest';
@@ -706,6 +707,8 @@
     const template = document.createElement('template'); template.innerHTML = sheetHTML();
     const next = template.content.querySelector('#livePreview');
     if (next) current.innerHTML = next.innerHTML;
+    const c2 = document.getElementById('livePreview2'), n2 = template.content.querySelector('#livePreview2');
+    if (c2 && n2) c2.innerHTML = n2.innerHTML;
   }
   function legacyEarnReview() {
     const rows = S.crypto.filter((e) => FC.rewardNeedsReview(e));
@@ -1059,6 +1062,108 @@
   }
   const editDel = () => (UI.args && UI.args.edit ? '<button type="button" class="btn danger block" data-a="cxDel" data-id="' + esc(UI.args.edit) + '">' + ic('trash', 18) + 'Șterge operațiunea</button><span class="tiny muted" style="line-height:1.5">Modificarea înlocuiește operațiunea veche. Dacă ai și vânzări sau Earn din moneda asta, verific că totul rămâne acoperit.</span>' : '');
   const numIn = (v) => (v == null || v === '' ? '' : String(+(+v).toFixed(8)).replace('.', ','));
+  /* --- calculator de dobândă (Economii). Nu salvează nimic; folosește aceeași regulă ca și contul. --- */
+  function calcChart(ser, endLabel) {
+    if (ser.length < 2) return '';
+    const W = 320, Hh = 140, pT = 14, pB = 18;
+    const mx = Math.max(1, ...ser.map((p) => p.bal)), mn = 0;
+    const X = (i) => 2 + i / (ser.length - 1) * (W - 4);
+    const Y = (v) => pT + (1 - (v - mn) / (mx - mn)) * (Hh - pT - pB);
+    const path = (k) => ser.map((p, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p[k]).toFixed(1)).join(' ');
+    const last = ser[ser.length - 1];
+    return '<svg role="img" aria-label="Soldul în timp față de banii depuși" width="100%" viewBox="0 0 ' + W + ' ' + Hh + '" style="display:block">' +
+      '<path d="' + path('bal') + ' L' + X(ser.length - 1).toFixed(1) + ' ' + (Hh - pB) + ' L' + X(0).toFixed(1) + ' ' + (Hh - pB) + ' Z" style="fill:color-mix(in srgb,var(--green) 16%,transparent)"/>' +
+      '<path d="' + path('put') + '" fill="none" stroke="#9EA3B5" stroke-width="1.6" stroke-dasharray="5 4" stroke-linejoin="round"/>' +
+      '<path d="' + path('bal') + '" fill="none" style="stroke:var(--green)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="' + X(ser.length - 1).toFixed(1) + '" cy="' + Y(last.bal).toFixed(1) + '" r="4" style="fill:var(--green)"/>' +
+      '<text x="2" y="' + (Hh - 4) + '" fill="#9EA3B5" font-size="10">azi</text><text x="' + (W - 2) + '" y="' + (Hh - 4) + '" fill="#9EA3B5" font-size="10" text-anchor="end">' + esc(endLabel) + '</text>' +
+      '<text x="' + (W - 2) + '" y="10" fill="#9EA3B5" font-size="10" text-anchor="end">' + fmt(mx, 0) + ' lei</text></svg>' +
+      '<div class="row tiny soft" style="gap:14px"><span class="row" style="gap:5px"><span style="width:10px;height:3px;border-radius:2px;background:var(--green)"></span>Sold</span><span class="row" style="gap:5px"><span style="width:10px;height:0;border-top:2px dashed #9EA3B5"></span>Depus de tine</span></div>';
+  }
+  function calcTable(run, view) {
+    const ser = run.series, today = new Date();
+    const monthly = view === 'm' || run.months <= 12;
+    const idx = [];
+    if (monthly) for (let k = 1; k <= Math.min(run.months, 120); k++) idx.push(k);
+    else { for (let k = 12; k <= run.months; k += 12) idx.push(k); if (run.months % 12) idx.push(run.months); }
+    const lbl = (k) => { if (!monthly) return k % 12 ? fmt(k / 12, 1) + ' ani' : 'Anul ' + k / 12; const d = new Date(today.getFullYear(), today.getMonth() + k, 1); return MSHORT[d.getMonth()] + ' ' + String(d.getFullYear()).slice(2); };
+    let prev = ser[0];
+    const rows = idx.map((k) => { const p = ser[k] || ser[ser.length - 1], it = p.int - prev.int; prev = p; return '<span>' + lbl(k) + '</span><span class="m">' + fmt(p.put, 0) + '</span><span class="m green">+' + fmt(it, 2) + '</span><span class="m">' + fmt(p.bal, 0) + '</span>'; }).join('');
+    return '<div class="calc-tbl tiny"><span class="muted">' + (monthly ? 'Luna' : 'Când') + '</span><span class="muted">Depus</span><span class="muted">Dobândă</span><span class="muted">Sold</span>' + rows + '</div>' +
+      (monthly && run.months > 120 ? '<span class="tiny muted">Afișez primele 120 de luni. Vezi restul pe ani.</span>' : '');
+  }
+  function savCalcSheet() {
+    const F = UI.form, s = S.settings.savings, mode = F.mode;
+    const seg = (k, opts) => '<div class="seg" style="grid-template-columns:repeat(' + opts.length + ',minmax(0,1fr))">' + opts.map((o) => '<button type="button" class="' + (F[k] === o[0] ? 'on' : '') + '" data-a="calcSet" data-k="' + k + '" data-v="' + o[0] + '">' + o[1] + '</button>').join('') + '</div>';
+    const inp = (label, k) => field(label, 'c_' + k, F[k], 'inputmode="decimal" autocomplete="off" data-live="' + k + '"');
+    const bal = Math.round(FC.savingsBalance(S) || 0);
+    const period = '<div class="calc-per">' + inp('Perioada', 'n') + seg('unit', [['m', 'luni'], ['y', 'ani']]) + '</div>';
+    const startRow = inp('Pornesc cu (lei)', 'start') + '<div class="row" style="gap:16px;margin-top:-6px"><button type="button" class="link small" data-a="calcSet" data-k="start" data-v="0" style="min-height:0">Pornesc de la 0</button>' + (bal ? '<button type="button" class="link small" data-a="calcSet" data-k="start" data-v="' + bal + '" style="min-height:0">Soldul meu (' + fmt(bal, 0) + ' lei)</button>' : '') + '</div>';
+    let inputs = '';
+    if (mode === 'earn') inputs = inp('Suma din cont (lei)', 'amt');
+    else if (mode === 'plan') inputs = startRow + '<div class="calc-per">' + inp('Depun (lei)', 'dep') + seg('freq', [['m', 'pe lună'], ['w', 'pe săpt.']]) + '</div>' + period;
+    else inputs = seg('gmode', [['income', 'Venit dorit'], ['sum', 'Sumă dorită']]) + (F.gmode === 'sum'
+      ? inp('Vreau să am (lei)', 'target') + period + startRow + '<div class="field"><label>Depun</label>' + seg('freq', [['m', 'în fiecare lună'], ['w', 'în fiecare săpt.']]) + '</div>'
+      : inp('Vreau să câștig (lei)', 'want') + seg('per', [['day', 'pe zi'], ['week', 'pe săpt.'], ['month', 'pe lună'], ['year', 'pe an']]));
+    return sheetWrap('Calculator', '<div class="col" style="gap:14px">' + seg('mode', [['earn', 'Cât câștig'], ['plan', 'Depun'], ['goal', 'Țintă']]) + inputs +
+      '<div id="livePreview">' + savCalcResult() + '</div>' +
+      '<div class="grid2">' + inp('Dobândă pe an (%)', 'rate') + inp('Impozit (%)', 'tax') + '</div>' +
+      '<div id="livePreview2" class="col" style="gap:8px">' + savCalcFoot() + '</div></div>', { cancel: 'Închide' });
+  }
+  function savCalcResult() {
+    const F = UI.form, s = S.settings.savings, v = (k) => num(F[k]);
+    const apr = v('rate') / 100, tax = v('tax') / 100;
+    const box = (inner) => '<section class="card col" style="gap:10px;padding:16px;background:var(--bg)">' + inner + '</section>';
+    const foot = '';
+    if (!(apr >= 0) || !(tax >= 0) || tax >= 1) return box('<span class="small soft">Scrie dobânda pe an și impozitul, de exemplu 2,75 și 10.</span>') + foot;
+    const tile = (l, x) => '<div class="col" style="gap:2px"><span class="tiny muted">' + l + '</span><span class="m green" style="font-size:20px;font-weight:600">+' + fmt(x, x < 1 ? 3 : 2) + '</span><span class="tiny muted">lei</span></div>';
+    if (F.mode === 'earn') {
+      const P = v('amt');
+      if (!(P > 0)) return box('<span class="small soft">Scrie suma, de exemplu 500.</span>') + foot;
+      const r = FC.savCalcEarn(P, apr, tax);
+      return box('<span class="small muted">Cu ' + lei(P, P % 1 ? 2 : 0) + ' în cont câștigi, net:</span><div class="grid2" style="row-gap:12px">' + tile('Pe zi', r.day) + tile('Pe săptămână', r.week) + tile('Pe lună', r.month) + tile('Pe an', r.year) + '</div>' +
+        '<span class="tiny muted" style="line-height:1.5">Pe an include dobânda la dobândă. Fără impozit ar fi ' + lei(r.yearGross, 2) + ' pe an.</span>') + foot;
+    }
+    const n = v('n'), months = Math.round(F.unit === 'y' ? n * 12 : n);
+    const perLbl = F.unit === 'y' ? (n === 1 ? '1 an' : fmt(n, n % 1 ? 1 : 0) + ' ani') : (months === 1 ? '1 lună' : months + ' luni');
+    const base = { start: Math.max(0, v('start') || 0), freq: F.freq, months, apr, tax, payDay: s.payDay, from: FC.localISO() };
+    const needPeriod = F.mode === 'plan' || F.gmode === 'sum';
+    if (needPeriod && !(months >= 1)) return box('<span class="small soft">Scrie perioada, de exemplu 2 ani.</span>') + foot;
+    if (needPeriod && months > 600) return box('<span class="small soft">Perioada poate fi de cel mult 50 de ani.</span>') + foot;
+    const each = F.freq === 'w' ? 'pe săptămână' : 'pe lună';
+    const details = (run) => calcChart(run.series, 'peste ' + perLbl) + seg2('tview', [['y', 'Pe ani'], ['m', 'Pe luni']], run.months <= 12) + calcTable(run, F.tview);
+    if (F.mode === 'plan') {
+      const dep = Math.max(0, v('dep') || 0), run = FC.savCalcRun(Object.assign({}, base, { dep }));
+      return box('<span class="small muted">Peste ' + perLbl + ' ai în cont</span><span class="big m" style="font-size:34px">' + lei(run.final, 2) + '</span>' +
+        (run.start ? kv('Pornești cu', lei(run.start, 0)) : '') + kv('Depui tu', (run.nDep ? run.nDep + ' × ' + fmt(dep, dep % 1 ? 2 : 0) + ' = ' : '') + lei(run.deposits, 0)) + kv('Dobândă câștigată', '<span class="green">+' + lei(run.interest, 2) + '</span>') +
+        (run.pending >= 0.01 ? '<span class="tiny muted" style="line-height:1.5">Din dobândă, ' + lei(run.pending, 2) + ' sunt câștigați până în ultima zi și intră în cont la plata următoare.</span>' : '') + details(run)) + foot;
+    }
+    if (F.gmode === 'sum') {
+      const target = v('target');
+      if (!(target > 0)) return box('<span class="small soft">Scrie suma la care vrei să ajungi.</span>') + foot;
+      const g = FC.savCalcGoal(Object.assign({}, base, { target }));
+      if (g.already) return box('<span class="small soft" style="line-height:1.5">Ajungi acolo fără depuneri: cu ' + lei(base.start, 0) + ' acum, peste ' + perLbl + ' ai ' + lei(g.run.final, 2) + '.</span>' + details(g.run)) + foot;
+      if (!isFinite(g.dep)) return box('<span class="small soft">Nu pot calcula cu datele astea.</span>') + foot;
+      return box('<span class="small muted">Ca să ai ' + lei(target, 0) + ' peste ' + perLbl + ', depui</span><span class="big m" style="font-size:34px">' + lei(g.dep, 2) + '</span><span class="small soft">' + each + '</span>' +
+        kv('Depui în total', g.run.nDep + ' × ' + fmt(g.dep, 2) + ' = ' + lei(g.run.deposits, 0)) + kv('Dobândă câștigată', '<span class="green">+' + lei(g.run.interest, 2) + '</span>') + kv('Ajungi la', lei(g.run.final, 2)) + details(g.run)) + foot;
+    }
+    const want = v('want'), per = F.per;
+    if (!(want > 0)) return box('<span class="small soft">Scrie cât vrei să câștigi, de exemplu 50.</span>') + foot;
+    const need = FC.savCalcNeeded(want, per, apr, tax), perTxt = { day: 'pe zi', week: 'pe săptămână', month: 'pe lună', year: 'pe an' }[per];
+    if (!isFinite(need)) return box('<span class="small soft">Cu dobândă 0% nu câștigi nimic, oricât ai pune.</span>') + foot;
+    const bal = FC.savingsBalance(S) || 0, have = FC.savCalcEarn(bal, apr, tax)[per];
+    return box('<span class="small muted">Ca să câștigi ' + lei(want, want % 1 ? 2 : 0) + ' ' + perTxt + ', net, îți trebuie în cont</span><span class="big m" style="font-size:34px">' + lei(Math.ceil(need), 0) + '</span>' +
+      (bal ? kv('Ai acum', lei(bal, 0)) + (bal < need ? kv('Îți mai lipsesc', lei(Math.ceil(need - bal), 0)) : '') + kv('Acum câștigi ' + perTxt, '<span class="green">+' + fmt(have, have < 1 ? 3 : 2) + ' lei</span>') : '')) + foot;
+  }
+  function savCalcFoot() {
+    const s = S.settings.savings, apr = num(UI.form.rate) / 100;
+    return (apr >= 0 && Math.abs(apr - s.apr) > 1e-9 ? '<button type="button" class="link small" data-a="calcSet" data-k="rate" data-v="' + numIn(+(s.apr * 100).toFixed(4)) + '" style="min-height:0;align-self:flex-start">Revin la dobânda contului (' + fmt(s.apr * 100, 2) + '%)</button>' : '') +
+      '<span class="tiny muted" style="line-height:1.5">Aceeași regulă ca la contul tău: dobândă calculată zilnic, primită pe ' + (s.payDay || 1) + ' ale lunii și adăugată la sold, cu impozitul deja reținut. Ce schimbi aici nu modifică contul.</span>';
+  }
+  function seg2(k, opts, hide) {
+    if (hide) return '';
+    return '<div class="seg" style="grid-template-columns:repeat(' + opts.length + ',minmax(0,1fr))">' + opts.map((o) => '<button type="button" class="' + (UI.form[k] === o[0] ? 'on' : '') + '" data-a="calcSet" data-k="' + k + '" data-v="' + o[0] + '">' + o[1] + '</button>').join('') + '</div>';
+  }
   function sheetHTML() {
     const s = UI.sheet, A = UI.args || {}, F = UI.form;
     if (!s) return '';
@@ -1146,6 +1251,7 @@
         field('Dobândă primită (lei, net)', 'amount', e.est ? '' : e.amount, 'inputmode="decimal" required placeholder="' + fmt(e.amount, 2) + '"') +
         '<input type="hidden" name="id" value="' + esc(e.id) + '">', 'Salvează', 'savInt');
     }
+    if (s === 'savCalc') return savCalcSheet();
     if (s === 'savSet') return formSheet('Soldul real din cont', field('Sold acum (lei)', 'amount', FC.savingsBalance(S) || '', 'inputmode="decimal" required') + '<span class="small muted" style="line-height:1.5">Pui cifra din aplicația băncii. Nu mută bani din fonduri, doar corectează soldul.</span>', 'Salvează', 'savSet');
     if (s === 'cashAdd') return formSheet('Pușculița', '<div class="field"><label for="f_d">Ce pui</label><select id="f_d" class="input" name="denom">' + S.settings.denoms.map((d) => '<option value="' + d.id + '">' + d.label + '</option>').join('') + '</select></div>' +
       '<div class="grid2">' + field('Câte (sau câți €)', 'count', '', 'inputmode="decimal" required') + '<div class="field"><label for="f_dir">Operație</label><select id="f_dir" class="input" name="dir"><option value="1">Pun deoparte</option><option value="-1">Scot</option></select></div></div>' +
@@ -1206,13 +1312,13 @@
     else if (UI.tab === 'stats') main = statsScreen();
     else main = homeScreen();
     UI.stay = !!(oldSheet && lastSheetName === UI.sheet);
-    if (UI.stay && UI.slideFrom == null && UI.sheet !== 'add') {
+    if (UI.stay && !UI.full && UI.slideFrom == null && UI.sheet !== 'add') {
       updateLivePreview();
       return;
     }
     $app.innerHTML = main + (S.settings.setupDone ? tabbar() : '') + sheetHTML();
     setupCoinSuggestions();
-    lastSheetName = UI.sheet; UI.slideFrom = null; UI.stay = false;
+    lastSheetName = UI.sheet; UI.slideFrom = null; UI.stay = false; UI.full = false;
     if (key !== lastKey) window.scrollTo(0, 0); else window.scrollTo(0, y);
     if (lastKey && key !== lastKey && !UI.sheet) {
       $app.querySelector('.screen')?.classList.add('screen-enter');
@@ -1384,6 +1490,8 @@
     earnStop: (d) => { const e = S.earn.find((x) => x.id === d.id); if (e) ask('Ai scos ' + e.coin + ' din Earn? Recompensele deja confirmate rămân în portofoliu. Confirmă întâi încasările reale; estimările nu se încasează automat.', 'Da, l-am scos', () => { FC.earnStop(S, d.id); closeSheet(); commit('Scos din Earn'); }); },
     savDel: (d) => ask('Ștergi operațiunea?', 'Șterge', () => { const tx = S.tx.find((t) => t.link === d.id); if (tx) FC.deleteTx(S, tx.id); else S.savings = S.savings.filter((e) => e.id !== d.id); commit('Șters'); render(); }),
     formSet: (d) => { UI.form[d.k] = d.v; lastSheetName = null; render(); },
+    calcSet: (d) => { UI.form[d.k] = d.v; UI.full = true; render(); },
+    savCalc: () => { const s = S.settings.savings, b = Math.round(FC.savingsBalance(S) || 0); openSheet('savCalc', { mode: 'earn', rate: numIn(+(s.apr * 100).toFixed(4)), tax: numIn(+(s.tax * 100).toFixed(2)), amt: b ? String(b) : '500', start: b ? String(b) : '0', dep: '50', freq: 'm', n: '2', unit: 'y', gmode: 'income', want: '50', per: 'week', target: '5000', tview: 'y' }); },
     catDel: (d) => ask('Ștergi categoria „' + d.c + '”? Tranzacțiile vechi o păstrează.', 'Șterge', () => { S.settings.categories = S.settings.categories.filter((c) => c !== d.c); commit(); render(); }),
     cashOrd: (d) => { const o = S.settings.cashOrder, i = o.indexOf(d.f), j = i + (+d.d); if (i < 0 || j < 0 || j >= o.length) return; [o[i], o[j]] = [o[j], o[i]]; commit(); render(); },
     cashOrdDel: (d) => { S.settings.cashOrder = S.settings.cashOrder.filter((f) => f !== d.f); commit(); render(); },

@@ -756,6 +756,56 @@
     return accrueSavings(state, p.now);
   }
 
+  /* ---------- calculator de dobândă (nu salvează nimic) ----------
+     Același model ca la cont: dobândă zilnică pe sold (apr/365), adunată și plătită lunar în ziua payDay,
+     cu impozitul reținut la plată. Depunerile: prima chiar în ziua de pornire, apoi la fiecare lună / săptămână. */
+  function savCalcRates(apr, tax) { const a = Math.max(0, apr) * (1 - Math.min(1, Math.max(0, tax))); return { a, day: a / 365, week: a * 7 / 365, month: a / 12, year: Math.pow(1 + a / 12, 12) - 1 }; }
+  function savCalcEarn(amount, apr, tax) {
+    const r = savCalcRates(apr, tax), P = Math.max(0, amount || 0);
+    return { day: P * r.day, week: P * r.week, month: P * r.month, year: P * r.year, yearGross: P * (Math.pow(1 + Math.max(0, apr) / 12, 12) - 1) };
+  }
+  function savCalcNeeded(want, per, apr, tax) {
+    const r = savCalcRates(apr, tax)[per];
+    return r > 0 ? Math.max(0, want || 0) / r : Infinity;
+  }
+  function savCalcRun(o) {
+    const apr = Math.max(0, o.apr || 0), keep = 1 - Math.min(1, Math.max(0, o.tax || 0));
+    const months = Math.min(600, Math.max(0, Math.round(o.months || 0))), dep = Math.max(0, o.dep || 0), weekly = o.freq === 'w';
+    const payDay = Math.min(31, Math.max(1, parseInt(o.payDay, 10) || 1));
+    const d0 = o.from ? new Date(String(o.from).slice(0, 10) + 'T12:00') : new Date();
+    d0.setHours(12, 0, 0, 0);
+    const addM = (k) => { const x = new Date(d0.getFullYear(), d0.getMonth() + k, 1, 12); x.setDate(Math.min(d0.getDate(), new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate())); return x; };
+    const key = (x) => x.getFullYear() * 10000 + (x.getMonth() + 1) * 100 + x.getDate();
+    const isPay = (x) => x.getDate() === Math.min(payDay, new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate());
+    const marks = []; for (let k = 0; k <= months; k++) marks.push(key(addM(k)));
+    const end = marks[months];
+    let bal = Math.max(0, o.start || 0), acc = 0, paid = 0, put = 0, nDep = 0, mi = 1, day = 0, nextDep = dep > 0 && months > 0 ? key(d0) : Infinity, depM = 1;
+    const series = [{ m: 0, bal, put: bal, int: 0 }];
+    for (let x = new Date(d0); key(x) < end; x.setDate(x.getDate() + 1), day++) {
+      const k = key(x);
+      if (k === nextDep) {
+        bal += dep; put += dep; nDep++;
+        if (weekly) { const y = new Date(x); y.setDate(y.getDate() + 7); nextDep = key(y); } else nextDep = marks[depM++] < end ? marks[depM - 1] : Infinity;
+      }
+      acc += bal * apr / 365;
+      if (isPay(x) && day > 0) { const net = acc * keep; bal += net; paid += net; acc = 0; }
+      const kn = new Date(x); kn.setDate(kn.getDate() + 1);
+      if (key(kn) === marks[mi]) { series.push({ m: mi, bal: bal + acc * keep, put: Math.max(0, o.start || 0) + put, int: paid + acc * keep }); mi++; }
+    }
+    const pending = acc * keep, start = Math.max(0, o.start || 0);
+    return { final: bal + pending, start, deposits: put, nDep, interest: paid + pending, pending, months, series };
+  }
+  /* Cât trebuie depus periodic ca să ajungi la „target” în „months”. Soldul final crește liniar cu depunerea. */
+  function savCalcGoal(o) {
+    const base = savCalcRun(Object.assign({}, o, { dep: 0 })).final;
+    if (base >= o.target) return { dep: 0, run: savCalcRun(Object.assign({}, o, { dep: 0 })), already: true };
+    const one = savCalcRun(Object.assign({}, o, { dep: 1 }));
+    const per = one.final - base;
+    if (!(per > 0)) return { dep: Infinity, run: null };
+    const dep = Math.ceil((o.target - base) / per * 100) / 100;
+    return { dep, run: savCalcRun(Object.assign({}, o, { dep })), already: false };
+  }
+
   /* ---------- venit pasiv: dobândă + recompense Earn ---------- */
   function passiveIncome(state, fromISO, toISO) {
     const rate = state.fx.usdRon || 4.8;
@@ -1218,6 +1268,7 @@
     earnAdd, earnLog, rewardNeedsReview, classifyReward, cryptoHistory, cryptoEventLabel, earnSummary, savingsDeposit, savingsWithdraw, savingsBalance, accrueSavings,
     runRecurring, periodStats, monthRange, monthsBack, feeReport, isExpense,
     netWorth, snapshot, worthSeries, validateBackup, exportRows, kindLabel,
+    savCalcRates, savCalcEarn, savCalcNeeded, savCalcRun, savCalcGoal,
     exName, cryptoBreakdown, earnSpot, earnAutoSync, earnAutoSet, setPet, setBank, savingsSetup, passiveIncome, passiveYearEstimate, fundSetBalance, cryptoFix, cryptoFixStable, cryptoFixInvested, interestBetween, earnAccrued, earnFix, earnStop, setInterestReal, savingsNext, finYM, availableFunds, fundSeries, savingsReport, investReport, coinsEver, portfolioSeries, goalProgress, paceCompare
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = FC;

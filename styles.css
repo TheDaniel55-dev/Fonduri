@@ -195,3 +195,6 @@ details.why>summary{list-style:none;display:flex;align-items:center;gap:6px;curs
 details.why>summary::-webkit-details-marker{display:none}
 details.why>summary svg{transition:transform .2s}
 details.why[open]>summary svg{transform:rotate(90deg)}
+.calc-tbl{display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:6px 10px;align-items:baseline}
+.calc-tbl span:nth-child(4n+2),.calc-tbl span:nth-child(4n+3),.calc-tbl span:nth-child(4n){text-align:right}
+.calc-per{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:end}
