@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const FC = window.FC;
-  const APP_VERSION = '1.11.0';            // aceeași cu VERSION din sw.js (verificat de teste)
+  const APP_VERSION = '1.11.1';            // aceeași cu VERSION din sw.js (verificat de teste)
   const APP_DATE = '23 noiembrie 2026';
   const KEY = 'fonduri.data.v1';
   const $app = document.getElementById('app');
@@ -633,7 +633,7 @@
       '<span class="m green" style="font-size:26px;font-weight:600">+' + cm(nx.accrued, 2) + '</span>' +
       '<span class="tiny soft m">azi încă +' + cm(nx.daily, 4) + '. Pe ' + nd.getDate() + ' ' + MONTHS[nd.getMonth()] + ' primești ≈ ' + cm(nx.estNext, 2) + ' net</span></div>' +
       '<div class="grid3"><div class="col"><span class="tiny muted">Primit în 12 luni</span><span class="m green" style="font-weight:600">+' + cm(last12, 2) + '</span></div><div class="col"><span class="tiny muted">Peste 1 an</span><span class="m" style="font-weight:600">' + cm(proj(1), 0) + '</span></div><div class="col"><span class="tiny muted">Peste 5 ani</span><span class="m" style="font-weight:600">' + cm(proj(5), 0) + '</span></div></div>' +
-      '<div class="grid3"><button class="btn primary" data-a="sheet" data-s="savDep">Depun</button><button class="btn" data-a="sheet" data-s="savWd">Retrag</button><button class="btn" data-a="sheet" data-s="savSet">Corectez</button></div' +
+      '<div class="grid3"><button class="btn primary" data-a="sheet" data-s="savDep">Depun</button><button class="btn" data-a="sheet" data-s="savWd">Retrag</button><button class="btn" data-a="sheet" data-s="savSet">Corectez</button></div>' +
       '<button class="btn block" data-a="savCalc">' + ic('stats', 18) + 'Calculator de dobândă</button>' +
       '<span class="tiny muted" style="line-height:1.5">Plata apare singură în ziua ei, ca estimare.' + (pendingEst ? ' Când vezi suma reală în aplicația băncii, apasă pe ea în listă și scrie cifra.' : '') + ' Proiecția nu include depunerile viitoare. <button class="link" data-a="sheet" data-s="savSetup" style="min-height:0;font-size:inherit">Reconfigurez contul</button></span></section>' +
       '<div class="card tight">' + ev.map((e) => {

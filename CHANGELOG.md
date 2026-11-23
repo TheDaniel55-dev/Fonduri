@@ -1,5 +1,9 @@
 # Change Log — Fonduri
 
+## 1.11.1 · 23 noiembrie 2026
+### Butonul Calculator de dobândă se apasă
+Pe ecranul Economii, la un cont configurat, butonul Calculator de dobândă apărea doar ca text, iar apăsarea lui nu făcea nimic. Acum este un buton întreg sub Depun, Retrag și Corectez și deschide calculatorul.
+
 ## 1.11.0 · 23 noiembrie 2026
 ### Calculator de dobândă în Economii
 Pe ecranul Economii, butonul Calculator de dobândă deschide un calculator cu trei moduri. Cât câștig arată câștigul net pe zi, pe săptămână, pe lună și pe an pentru o sumă. Depun arată soldul după o perioadă cu depuneri lunare sau săptămânale, cât ai depus și câtă dobândă ai primit, cu un grafic și un tabel pe ani sau pe luni. Țintă calculează de ce sumă ai nevoie ca să câștigi un anumit venit sau cât trebuie să depui ca să ajungi la o sumă.
