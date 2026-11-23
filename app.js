@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const FC = window.FC;
-  const APP_VERSION = '1.11.1';            // aceeași cu VERSION din sw.js (verificat de teste)
+  const APP_VERSION = '1.12.0';            // aceeași cu VERSION din sw.js (verificat de teste)
   const APP_DATE = '23 noiembrie 2026';
   const KEY = 'fonduri.data.v1';
   const $app = document.getElementById('app');
@@ -17,6 +17,7 @@
     return FC.emptyState();
   }
   function save() {
+    if (typeof citySoon === 'function') citySoon();
     try { localStorage.setItem(KEY, JSON.stringify(S)); }
     catch (e) { toast('Nu am putut salva pe telefon: ' + e.message, true); }
   }
@@ -949,7 +950,7 @@
       grp('look', 'Aspect', (THEMES[th.accent] || THEMES.mov).name + ', ' + (BGS[th.bg] || BGS.denim).name + ', text ' + (SIZES[th.size] || SIZES.normal)[0].toLowerCase(), lookBody),
       grp('month', 'Luna financiară', (s.monthStart || 1) === 1 ? 'de pe 1 până la sfârșitul lunii' : 'începe pe ' + s.monthStart, monthBody),
       grp('priv', 'Confidențialitate', 'Face ID, mod discret', privBody),
-      grp('city', 'Orașul DSL', 'sincronizare manuală prin QR', '<button class="btn primary block" data-a="syncCity">Scanează QR-ul din oraș</button><p class="small muted">Trimite portofoliul criptat prin Wi-Fi, după aprobarea cu cheia de acces. Datele din telefon rămân sursa principală.</p>' + (localStorage.getItem('fonduri.receiver.v1') ? '<button class="btn" data-a="forgetCity">Uit cheia acestui PC</button>' : '')),
+      grp('city', 'Orașul DSL', 'sincronizare automată prin Tailscale', cityBody()),
       grp('changeLog', 'Change Log', 'Istoricul versiunilor', '<dsl-change-log></dsl-change-log>'),
       grp('data', 'Date', 'export, import', dataBody)
     ].map((h) => ({ id: (h.match(/data-set="([^"]+)"/) || [])[1], h }));
@@ -1381,7 +1382,43 @@
     }
   }
 
+  /* Orașul DSL: sincronizare automată (1.12.0) */
+  function cityBody() {
+    const c = window.cityStatus ? window.cityStatus() : {};
+    const when = (t) => t ? new Date(t).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+    let h;
+    if (c.u && c.id) {
+      h = '<p class="small">Asociat. Portofoliul se trimite singur când deschizi Fonduri, dacă Tailscale e pornit. Nu-ți cere nicio confirmare.</p>' +
+        '<p class="small"><b>Ultima sincronizare:</b> ' + esc(when(c.lastOk)) + (c.lastErr ? '<br><span class="muted">Ultima încercare: ' + esc(c.lastErr) + '</span>' : '') + '</p>' +
+        '<button class="btn primary block" data-a="citySyncNow">Trimite acum</button>' +
+        '<button class="btn" data-a="cityUnpair">Dezasociază acest telefon</button>';
+    } else {
+      h = '<p class="small">În aplicația orașului: Setări → Fonduri → Generează cheia de asociere. Copiaz-o, lipește-o aici și apasă Asociază. Cu Tailscale pornit, de acum portofoliul se trimite singur când deschizi Fonduri.</p>' +
+        '<input class="input" id="cityKey" placeholder="Cheia din oraș (ORAS2.…)" autocomplete="off" autocapitalize="off" spellcheck="false">' +
+        '<button class="btn primary block" data-a="cityPair">Asociază</button>';
+    }
+    return h + '<details class="small muted"><summary>Sincronizarea veche prin QR</summary><p class="small muted">Merge doar pe același Wi-Fi. Orașul nu mai ascultă pe Wi-Fi, deci QR-ul nu mai funcționează.</p><button class="btn block" data-a="syncCity">Scanează QR-ul din oraș</button>' +
+      (localStorage.getItem('fonduri.receiver.v1') ? '<button class="btn" data-a="forgetCity">Uit cheia acestui PC</button>' : '') + '</details>';
+  }
+  var citySoonT;
+  function citySync(force) { if (window.citySyncAuto && (unlocked || !S.settings.lock.enabled)) return window.citySyncAuto(force); return Promise.resolve({ ok: false, skip: true }); }
+  function citySoon() { clearTimeout(citySoonT); citySoonT = setTimeout(() => citySync(false), 60000); }
+
   const actions = {
+    cityPair: async (_, button) => {
+      const v = (document.getElementById('cityKey') || {}).value;
+      button.disabled = true;
+      try { await window.cityPair(v); toast('Asociat cu orașul'); const r = await citySync(true); if (r && r.ok) toast('Sincronizat cu orașul'); render(); }
+      catch (e) { toast(e.message, true); }
+      finally { button.disabled = false; }
+    },
+    citySyncNow: async (_, button) => {
+      button.disabled = true; button.textContent = 'Se trimite…';
+      const r = await citySync(true);
+      toast(r && r.ok ? (r.msg || 'Sincronizat cu orașul') : ((r && r.msg) || 'Nu s-a putut trimite.'), !(r && r.ok));
+      render();
+    },
+    cityUnpair: () => ask('Dezasociezi telefonul de oraș? Sincronizarea automată se oprește până îl asociezi din nou.', 'Dezasociază', async () => { await window.cityForget(); render(); }),
     updateApp: (_, button) => checkAppUpdate(button),
     syncCity: () => window.startCitySync(),
     forgetCity: () => ask('Elimini cheia PC-ului de pe telefon? La următoarea scanare verifică fizic QR-ul pe PC-ul tău.', 'Uit cheia', () => { localStorage.removeItem('fonduri.receiver.v1'); render(); }),
@@ -1862,7 +1899,7 @@
   }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { hiddenAt = Date.now(); save(); startLive(); }
-    else if (unlocked || !S.settings.lock.enabled) { startLive(); refreshMarket(false); }
+    else if (unlocked || !S.settings.lock.enabled) { startLive(); refreshMarket(false); setTimeout(() => citySync(false), 2500); }
     if (document.hidden) return;
     else if (S.settings.lock.enabled && hiddenAt && Date.now() - hiddenAt > (S.settings.lockAfterMin || 0) * 60000) showLock();
   });
@@ -1988,6 +2025,7 @@
     if (b) toast('Dobânda la economii a fost adăugată');
     render();
     refreshMarket(false).then(startLive);
+    setTimeout(() => citySync(false), 2500);   // orașul: trimite singur dacă s-a schimbat ceva
   }
   render();
   window.fonduriSnapshot = () => {

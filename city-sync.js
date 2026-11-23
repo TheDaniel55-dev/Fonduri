@@ -87,3 +87,67 @@
   if(location.hash.startsWith('#oras=')) { const text=location.href;history.replaceState(null,'',location.pathname);shell();found(text); }
   window.addEventListener('pagehide',stopCamera);
 })();
+
+/* Sincronizare automată cu orașul (1.12.0): fără QR, fără confirmare, prin Tailscale.
+   Asocierea se face o dată, cu cheia generată în aplicația orașului. Telefonul își creează o cheie ECDSA
+   care nu poate fi exportată, iar orașul păstrează doar partea publică. Adresa orașului vine din cheia de
+   asociere și stă doar pe telefon, nu în codul public. Istoricul complet rămâne pe telefon. */
+(function () {
+  'use strict';
+  const K='fonduri.city.v2', enc=s=>new TextEncoder().encode(s);
+  const b64=b=>{const a=new Uint8Array(b);let s='';for(let i=0;i<a.length;i+=8192)s+=String.fromCharCode(...a.subarray(i,i+8192));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
+  const un64=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
+  const cfg=()=>{try{return JSON.parse(localStorage.getItem(K))||{};}catch(e){return {};}};
+  const setCfg=o=>{const c=Object.assign(cfg(),o);localStorage.setItem(K,JSON.stringify(c));return c;};
+  function db(){return new Promise((res,rej)=>{const r=indexedDB.open('fonduri-city',1);r.onupgradeneeded=()=>r.result.createObjectStore('k');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+  async function keyOp(mode,val){const d=await db();return new Promise((res,rej)=>{const st=d.transaction('k',mode==='get'?'readonly':'readwrite').objectStore('k');const q=mode==='get'?st.get('device'):mode==='put'?st.put(val,'device'):st.delete('device');q.onsuccess=()=>res(q.result||null);q.onerror=()=>rej(q.error);});}
+  async function call(url,opt,ms){const ac=new AbortController(),t=setTimeout(()=>ac.abort(),ms||5000);
+    try{const r=await fetch(url,Object.assign({signal:ac.signal,cache:'no-store',credentials:'omit'},opt||{}));const j=await r.json().catch(()=>({ok:false,msg:'Răspuns invalid de la oraș.'}));return j;}
+    finally{clearTimeout(t);}}
+  function parseKey(text){
+    const t=String(text||'').trim();if(!t.startsWith('ORAS2.'))throw Error('Cheia trebuie să înceapă cu ORAS2. Copiaz-o din aplicația orașului → Setări → Fonduri.');
+    const d=JSON.parse(new TextDecoder().decode(un64(t.slice(6))));const u=new URL(d.u);
+    if(d.v!==2||u.protocol!=='https:'||!u.hostname.endsWith('.ts.net')||u.pathname!=='/'&&u.pathname!==''||!/^[0-9A-F]{8}$/.test(d.c))throw Error('Cheie invalidă.');
+    return {u:u.origin,c:d.c};
+  }
+  window.cityStatus=()=>cfg();
+  window.cityPair=async function(text){
+    if(!window.isSecureContext||!crypto.subtle||!window.indexedDB)throw Error('Telefonul nu permite asocierea aici.');
+    const k=parseKey(text);
+    const kp=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);
+    const pub=b64(await crypto.subtle.exportKey('spki',kp.publicKey));
+    let r;try{r=await call(k.u+'/api/fonduri/v2/asociere',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cod:k.c,pub,nume:/iPhone/.test(navigator.userAgent)?'iPhone':'Telefon'})},8000);}
+    catch(e){throw Error('Nu ajung la oraș. Pornește Tailscale pe telefon și încearcă din nou.');}
+    if(!r.ok)throw Error(r.msg||'Asocierea a fost refuzată.');
+    await keyOp('put',{priv:kp.privateKey,id:r.id});
+    setCfg({u:k.u,id:r.id,paired:Date.now(),hash:null,lastOk:null,lastErr:null,lastTry:0});
+    return r;
+  };
+  window.cityForget=async function(){await keyOp('del').catch(()=>{});localStorage.removeItem(K);};
+  async function digest(o){const c=Object.assign({},o);delete c.at;const h=await crypto.subtle.digest('SHA-256',enc(JSON.stringify(c)));return b64(h).slice(0,22);}
+  let busy=false;
+  /* force=true: butonul „Trimite acum”. Altfel: trimite doar dacă portofoliul s-a schimbat sau au trecut 24 h;
+     după o încercare nereușită așteaptă 10 minute. Nu arată nimic dacă orașul nu răspunde. */
+  window.citySyncAuto=async function(force){
+    const c=cfg();if(!c.u||!c.id||busy)return {ok:false,skip:true};
+    let snap;try{snap=window.fonduriSnapshot();}catch(e){return {ok:false,skip:true,msg:e.message};}
+    const h=await digest(snap);
+    if(!force){
+      if(c.hash===h&&c.lastOk&&Date.now()-c.lastOk<864e5)return {ok:true,skip:true};
+      if(c.lastErr&&Date.now()-(c.lastTry||0)<6e5)return {ok:false,skip:true};
+    }
+    busy=true;setCfg({lastTry:Date.now()});
+    try{
+      const key=await keyOp('get');if(!key||key.id!==c.id)throw Error('Cheia telefonului lipsește. Asociază din nou.');
+      let ss;try{ss=await call(c.u+'/api/fonduri/v2/sesiune?d='+encodeURIComponent(c.id),{},4000);}catch(e){throw Error('Orașul nu răspunde (Tailscale oprit sau PC închis).');}
+      if(!ss.ok)throw Error(ss.msg||'Orașul a refuzat.');
+      const text=JSON.stringify(snap);
+      const sig=b64(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key.priv,enc(ss.n+'.'+text)));
+      let r;try{r=await call(c.u+'/api/fonduri/v2/trimite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({d:c.id,s:ss.s,snapshot:text,sig})},8000);}catch(e){throw Error('Trimiterea a fost întreruptă.');}
+      if(!r.ok)throw Error(r.msg||'Orașul a refuzat portofoliul.');
+      setCfg({lastOk:Date.now(),hash:h,lastErr:null});
+      return r;
+    }catch(e){setCfg({lastErr:e.message});return {ok:false,msg:e.message};}
+    finally{busy=false;}
+  };
+})();

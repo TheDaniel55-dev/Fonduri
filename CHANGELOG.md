@@ -1,5 +1,12 @@
 # Change Log — Fonduri
 
+## 1.12.0 · 23 noiembrie 2026
+### Sincronizare automată cu orașul
+Fonduri trimite singur portofoliul către Orașul DSL, prin Tailscale, fără QR și fără confirmare. Trimiterea pornește când deschizi sau redeschizi aplicația, după deblocare, și la un minut după ce modifici ceva. Se trimite doar dacă s-a schimbat ceva, sau o dată pe zi. Dacă Tailscale e oprit sau PC-ul nu răspunde, aplicația nu te deranjează și încearcă la următoarea deschidere. În Setări → Orașul DSL vezi ultima sincronizare reușită, motivul ultimei încercări nereușite și butonul Trimite acum.
+Asocierea se face o singură dată. În aplicația orașului generezi o cheie de asociere, o lipești în Setări → Orașul DSL și apeși Asociază. Telefonul își creează o cheie proprie care nu poate fi exportată, iar orașul primește doar partea ei publică. Fiecare trimitere este semnată cu această cheie și merge criptată prin Tailscale. Adresa orașului rămâne doar pe telefon. Pleacă aceleași date ca înainte: soldurile fondurilor, monedele și pozițiile Earn. Istoricul complet rămâne pe telefon. Dezasocierea oprește trimiterile.
+### Sincronizarea prin QR mutată la final
+Scanarea QR-ului din oraș merge doar pe același Wi-Fi, iar orașul nu mai ascultă pe Wi-Fi. Butonul a fost mutat sub „Sincronizarea veche prin QR”, cu această explicație. Asocierea veche și cheia salvată nu se schimbă.
+
 ## 1.11.1 · 23 noiembrie 2026
 ### Butonul Calculator de dobândă se apasă
 Pe ecranul Economii, la un cont configurat, butonul Calculator de dobândă apărea doar ca text, iar apăsarea lui nu făcea nimic. Acum este un buton întreg sub Depun, Retrag și Corectez și deschide calculatorul.
