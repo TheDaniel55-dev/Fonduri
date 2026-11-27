@@ -1462,9 +1462,10 @@
   async function cityPull() {
     if (!window.cityInbox || pulling) return; pulling = true;
     try {
-      const r = await window.cityInbox([]); if (!r || !r.ok || !Array.isArray(r.items) || !r.items.length) return;
+      const P = S.settings.pay, cfg = JSON.stringify({ card: P.mainCard, auto: P.rules.filter((x) => x.auto).map((x) => x.m) });
+      const r = await window.cityInbox([], cfg); if (!r || !r.ok || !Array.isArray(r.items) || !r.items.length) return;
       const res = FC.payIngest(S, r.items); commit();
-      await window.cityInbox(r.items.map((x) => String(x.id || '')).filter(Boolean)).catch(() => {});
+      await window.cityInbox(r.items.map((x) => String(x.id || '')).filter(Boolean), cfg).catch(() => {});
       const a = res.auto.length, p = res.pending.length;
       if (a || p) toast([a ? a + (a === 1 ? ' plată trecută' : ' plăți trecute') : '', p ? p + ' de aprobat' : ''].filter(Boolean).join(', '));
       render();
