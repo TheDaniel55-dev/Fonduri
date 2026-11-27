@@ -1,5 +1,9 @@
 # Change Log — Fonduri
 
+## 1.13.1 · 27 noiembrie 2026
+### Regulile merg și când nu se știe cardul
+Când scurtătura de pe iPhone nu trimite numele cardului, o plată la un comerciant cu regulă de intrare directă, de exemplu Lidl sau Kaufland, intră direct în tranzacții, cu categoria și fondul regulii. Comercianții noi și plățile în altă monedă așteaptă în continuare în De aprobat. Când cardul este trimis, regula rămâne cea de dinainte: intră direct doar plățile cu cardul principal.
+
 ## 1.13.0 · 27 noiembrie 2026
 ### Plățile din Apple Pay, cu listă de aprobare
 Fonduri poate primi plățile făcute cu Apple Pay, trimise de o automatizare din Comenzi rapide prin orașul DSL. Pe cardul principal, un comerciant care are regulă cu intrare directă devine cheltuială în categoria și fondul regulii. Restul așteaptă în lista De aprobat: plățile cu alte carduri, comercianții noi și plățile în altă monedă. Aceeași plată nu intră de două ori. Dacă ai trecut-o deja de mână în aceeași zi, cu aceeași sumă, lista te avertizează.

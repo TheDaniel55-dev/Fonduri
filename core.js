@@ -250,13 +250,14 @@
       if (card && P.cards.indexOf(card) < 0) { P.cards.push(card); if (P.cards.length > 12) P.cards.shift(); }
       const rule = payRuleFor(state, merchant), main = payIsMain(state, card);
       const it = { id, date: d, merchant, card, amount: r2(a.amount), cur, got: localISO() };
-      if (main && rule && rule.auto && cur === 'RON') {
+      const noCard = !payNorm(card);   // scurtătura n-a trimis cardul: regulile automate se aplică oricum
+      if ((main || noCard) && rule && rule.auto && cur === 'RON') {
         const t = addTx(state, { kind: 'expense', cat: payCat(state, rule.cat), fund: payFund(state, rule.fund), amount: it.amount, date: d, note: merchant, src: 'wallet' });
         res.auto.push(t); return;
       }
       it.cat = rule ? payCat(state, rule.cat) : null; it.fund = rule ? payFund(state, rule.fund) : null;
       it.dup = cur === 'RON' && payDup(state, it);
-      it.why = cur !== 'RON' ? 'cur' : !main ? 'card' : rule ? 'manual' : 'new';
+      it.why = cur !== 'RON' ? 'cur' : !main && !noCard ? 'card' : rule ? 'manual' : 'new';
       state.inbox.push(it); res.pending.push(it);
     });
     state.inbox.sort(byDate);

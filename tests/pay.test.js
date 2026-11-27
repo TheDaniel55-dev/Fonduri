@@ -62,3 +62,9 @@ test('Backup-urile vechi primesc regulile de început', () => {
   const s = FC.validateBackup(JSON.parse(JSON.stringify(old)));
   assert.ok(s.settings.pay.rules.length > 10); assert.deepStrictEqual(s.inbox, []); assert.strictEqual(s.settings.pay.warnDays, 3);
 });
+
+test('Fără card trimis: comerciantul cu regulă intră direct, cel nou așteaptă', () => {
+  const s = st();
+  const r = FC.payIngest(s, [{ id: 'w-000009', merchant: 'Lidl', amount: '12 RON' }, { id: 'w-000010', merchant: 'Ceva Nou', amount: '7 RON' }]);
+  assert.strictEqual(r.auto.length, 1); assert.strictEqual(s.inbox.length, 1); assert.strictEqual(s.inbox[0].why, 'new');
+});

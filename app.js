@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const FC = window.FC;
-  const APP_VERSION = '1.13.0';            // aceeași cu VERSION din sw.js (verificat de teste)
+  const APP_VERSION = '1.13.1';            // aceeași cu VERSION din sw.js (verificat de teste)
   const APP_DATE = '27 noiembrie 2026';
   const KEY = 'fonduri.data.v1';
   const $app = document.getElementById('app');
