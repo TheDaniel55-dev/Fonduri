@@ -19,6 +19,17 @@
     { id: 'eur', label: 'Euro', value: 1, cur: 'EUR' }
   ];
 
+  /* Reguli de început pentru plățile din Wallet: lanțuri naționale, editabile în Setări → Plăți automate. */
+  const PAY_RULES = [
+    ['LIDL', 'Mâncare'], ['KAUFLAND', 'Mâncare'], ['MEGA IMAGE', 'Mâncare'], ['PROFI', 'Mâncare'], ['CARREFOUR', 'Mâncare'],
+    ['AUCHAN', 'Mâncare'], ['PENNY', 'Mâncare'], ['UBER', 'Transport'], ['BOLT', 'Transport'], ['CATENA', 'Sănătate'],
+    ['DR MAX', 'Sănătate'], ['HELP NET', 'Sănătate'], ['SENSIBLU', 'Sănătate'], ['PRIMARK', 'Haine'], ['MR DIY', 'Casă'],
+    ['DEDEMAN', 'Casă'], ['IKEA', 'Casă'], ['JYSK', 'Casă']
+  ];
+  function defaultPay() {
+    return { mainCard: '', cards: [], warnDays: 3, rules: PAY_RULES.map((r, i) => ({ id: 'r' + i, m: r[0], cat: r[1], fund: null, auto: true })) };
+  }
+
   function defaultSettings() {
     return {
       splits: {
@@ -27,6 +38,7 @@
       },
       negPriority: 0.5,            // partea din fiecare venit care merge întâi în fondurile pe minus
       categories: CATEGORIES.slice(),
+      pay: defaultPay(),           // plăți din Wallet: card principal, reguli, atenționare
       eurRate: 5,                  // 1 € = 5 lei (regula ta)
       cashOrder: ['Rezervă', 'Achiziție', 'Investiții'],
       binance: { cardFee: 0.036, tradeFee: 0.001, bnbDiscount: 0.25, payFeeInBnb: true, cryptoFund: 'Investiții' },
@@ -67,6 +79,8 @@
       recurring: [],   // plăți recurente
       shortcuts: [],   // scurtături salvate manual
       goals: [],       // obiective: { id, name, fund, target, by, done }
+      inbox: [],       // plăți din Wallet care așteaptă aprobarea ta
+      paySeen: [],     // id-urile plăților deja primite (nu le iau de două ori)
       hist: {},        // prețuri de închidere pe zile: { SOL: { 'YYYY-MM-DD': 171.2 }, _ts: ... }
       snapshots: {},   // avere netă pe zile: { 'YYYY-MM-DD': lei }
       prices: {},      // { BTC: { p, ch, ts } }
@@ -191,6 +205,85 @@
       ['crypto', 'savings', 'cash'].forEach((k) => { state[k] = state[k].filter((e) => e.id !== t.link); });
     }
     state.tx = state.tx.filter((x) => x.id !== id);
+  }
+
+  /* ---------- plăți din Wallet (Apple Pay) ----------
+     Scurtătura trimite cardul, comerciantul și suma. Pe cardul principal, un comerciant cu regulă automată
+     intră direct ca cheltuială; restul (alt card, comerciant necunoscut, altă monedă) așteaptă în inbox. */
+  function payNorm(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+  function payRuleFor(state, merchant) {
+    const m = payNorm(merchant); let best = null;
+    (state.settings.pay.rules || []).forEach((r) => { const k = payNorm(r.m); if (k && m.indexOf(k) >= 0 && (!best || k.length > payNorm(best.m).length)) best = r; });
+    return best;
+  }
+  function payIsMain(state, card) { const k = payNorm(state.settings.pay.mainCard); return !!k && payNorm(card).indexOf(k) >= 0; }
+  function payCat(state, c) { return state.settings.categories.indexOf(c) >= 0 ? c : (state.settings.categories.indexOf('Altele') >= 0 ? 'Altele' : state.settings.categories[0]); }
+  function payFund(state, f) { return f && fundNames(state).indexOf(f) >= 0 ? f : null; }
+  /* suma vine din Wallet ca text: „12,50 RON”, „18,00 US$”, „1.234,56 lei”, „€5.00” */
+  function payAmount(v) {
+    if (typeof v === 'number') return { amount: v, cur: null };
+    let s = String(v || '').replace(/\s| /g, '');
+    const cur = /US\$|USD|\$/i.test(s) ? 'USD' : /EUR|€/i.test(s) ? 'EUR' : /RON|LEI/i.test(s) ? 'RON' : null;
+    s = s.replace(/[^0-9.,-]/g, '');
+    const lc = Math.max(s.lastIndexOf(','), s.lastIndexOf('.'));
+    if (lc >= 0 && s.length - lc - 1 <= 2) s = s.slice(0, lc).replace(/[.,]/g, '') + '.' + s.slice(lc + 1);
+    else s = s.replace(/[.,]/g, '');
+    return { amount: Math.abs(parseFloat(s) || 0), cur };
+  }
+  function payDup(state, it) {
+    const day = it.date.slice(0, 10);
+    return state.tx.some((t) => t.kind === 'expense' && t.src !== 'wallet' && t.date.slice(0, 10) === day && Math.abs(t.amount - it.amount) < 0.005);
+  }
+  function payIngest(state, items) {
+    const P = state.settings.pay, res = { auto: [], pending: [], skipped: 0 };
+    (Array.isArray(items) ? items : []).forEach((raw) => {
+      if (!raw || typeof raw !== 'object') { res.skipped++; return; }
+      const id = String(raw.id || '').slice(0, 64);
+      if (!/^[\w.:-]{6,64}$/.test(id) || state.paySeen.indexOf(id) >= 0) { res.skipped++; return; }
+      const a = payAmount(raw.amount);
+      const merchant = String(raw.merchant || '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Plată fără nume';
+      const card = String(raw.card || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+      const cur = String(raw.cur || a.cur || 'RON').toUpperCase().slice(0, 3);
+      if (!(a.amount > 0) || a.amount > 1e6) { res.skipped++; return; }
+      const d = /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(raw.date || '') ? String(raw.date).slice(0, 16) : localISO();
+      state.paySeen.push(id); if (state.paySeen.length > 1000) state.paySeen.splice(0, state.paySeen.length - 1000);
+      if (card && P.cards.indexOf(card) < 0) { P.cards.push(card); if (P.cards.length > 12) P.cards.shift(); }
+      const rule = payRuleFor(state, merchant), main = payIsMain(state, card);
+      const it = { id, date: d, merchant, card, amount: r2(a.amount), cur, got: localISO() };
+      if (main && rule && rule.auto && cur === 'RON') {
+        const t = addTx(state, { kind: 'expense', cat: payCat(state, rule.cat), fund: payFund(state, rule.fund), amount: it.amount, date: d, note: merchant, src: 'wallet' });
+        res.auto.push(t); return;
+      }
+      it.cat = rule ? payCat(state, rule.cat) : null; it.fund = rule ? payFund(state, rule.fund) : null;
+      it.dup = cur === 'RON' && payDup(state, it);
+      it.why = cur !== 'RON' ? 'cur' : !main ? 'card' : rule ? 'manual' : 'new';
+      state.inbox.push(it); res.pending.push(it);
+    });
+    state.inbox.sort(byDate);
+    return res;
+  }
+  /* Aprob o plată: devine cheltuială din fondul ales. remember=true: comerciantul trece la reguli (automat pe cardul principal). */
+  function payApprove(state, id, o) {
+    const it = state.inbox.find((x) => x.id === id); if (!it) throw new Error('Plata nu mai e în listă.');
+    if (it.cur !== 'RON') throw new Error('Plata e în ' + it.cur + '. Treci-o ca depunere crypto sau șterge-o.');
+    const cat = payCat(state, o.cat), fund = payFund(state, o.fund);
+    if (!fund) throw new Error('Alege fondul.');
+    const t = addTx(state, { kind: 'expense', cat, fund, amount: it.amount, date: it.date, note: it.merchant, src: 'wallet' });
+    if (o.remember) payRemember(state, it.merchant, cat, fund);
+    state.inbox = state.inbox.filter((x) => x.id !== id);
+    return t;
+  }
+  function payRemember(state, merchant, cat, fund) {
+    const rules = state.settings.pay.rules, k = payNorm(merchant);
+    let r = rules.find((x) => payNorm(x.m) === k);
+    if (!r) { r = { id: uid(), m: String(merchant).toUpperCase().slice(0, 40), cat, fund: fund || null, auto: true }; rules.push(r); }
+    else Object.assign(r, { cat, fund: fund || null, auto: true });
+    return r;
+  }
+  function payDismiss(state, id) { state.inbox = state.inbox.filter((x) => x.id !== id); }
+  function payOverdue(state) {
+    const lim = Date.now() - (state.settings.pay.warnDays || 3) * 864e5;
+    return state.inbox.filter((x) => new Date(x.got || x.date).getTime() < lim);
   }
 
   /* ---------- pușculița (bancnote + euro) ---------- */
@@ -1219,6 +1312,11 @@
     if (zs && typeof zs === 'object') ['crypto', 'savings'].forEach((z) => { if (zs[z] && /^(RON|USD|EUR)$/.test(zs[z].main)) st.settings.currency.zones[z] = { main: zs[z].main, sub: /^(RON|USD|EUR)?$/.test(zs[z].sub || '') ? (zs[z].sub || '') : '' }; });
     if (st.tx.length || st.crypto.length) st.settings.setupDone = true;   // are deja date: nu mai arătăm ecranul de început
     if (!Array.isArray(st.goals)) st.goals = [];
+    const pay = (obj.settings || {}).pay;
+    st.settings.pay = Object.assign(defaultPay(), pay && typeof pay === 'object' ? pay : {});
+    ['cards', 'rules'].forEach((k) => { if (!Array.isArray(st.settings.pay[k])) st.settings.pay[k] = k === 'rules' ? defaultPay().rules : []; });
+    if (!Array.isArray(st.inbox)) st.inbox = [];
+    if (!Array.isArray(st.paySeen)) st.paySeen = [];
     if (!st.hist || typeof st.hist !== 'object') st.hist = {};
     // fonduri care apar în tranzacții dar lipsesc din listă (fișiere vechi) se adaugă singure
     const known = st.settings.funds.map((f) => f.name);
@@ -1267,6 +1365,7 @@
     cryptoDeposit, cryptoTrade, cryptoWithdraw, cryptoReward, cryptoEditEvent, cryptoDeleteEvent, cryptoCheck, cryptoReplay, cryptoValue,
     earnAdd, earnLog, rewardNeedsReview, classifyReward, cryptoHistory, cryptoEventLabel, earnSummary, savingsDeposit, savingsWithdraw, savingsBalance, accrueSavings,
     runRecurring, periodStats, monthRange, monthsBack, feeReport, isExpense,
+    payNorm, payRuleFor, payIsMain, payAmount, payIngest, payApprove, payRemember, payDismiss, payOverdue, defaultPay,
     netWorth, snapshot, worthSeries, validateBackup, exportRows, kindLabel,
     savCalcRates, savCalcEarn, savCalcNeeded, savCalcRun, savCalcGoal,
     exName, cryptoBreakdown, earnSpot, earnAutoSync, earnAutoSet, setPet, setBank, savingsSetup, passiveIncome, passiveYearEstimate, fundSetBalance, cryptoFix, cryptoFixStable, cryptoFixInvested, interestBetween, earnAccrued, earnFix, earnStop, setInterestReal, savingsNext, finYM, availableFunds, fundSeries, savingsReport, investReport, coinsEver, portfolioSeries, goalProgress, paceCompare

@@ -1,5 +1,15 @@
 # Change Log — Fonduri
 
+## 1.13.0 · 27 noiembrie 2026
+### Plățile din Apple Pay, cu listă de aprobare
+Fonduri poate primi plățile făcute cu Apple Pay, trimise de o automatizare din Comenzi rapide prin orașul DSL. Pe cardul principal, un comerciant care are regulă cu intrare directă devine cheltuială în categoria și fondul regulii. Restul așteaptă în lista De aprobat: plățile cu alte carduri, comercianții noi și plățile în altă monedă. Aceeași plată nu intră de două ori. Dacă ai trecut-o deja de mână în aceeași zi, cu aceeași sumă, lista te avertizează.
+În De aprobat alegi categoria și fondul, apoi aprobi sau ștergi plata. „Aprobă mereu” ține minte comerciantul, cu categoria și fondul alese, iar plățile următoare de la el, făcute cu cardul principal, intră singure. O plată în dolari se poate trece direct ca depunere crypto, cu suma și data deja completate.
+### Plățile de aprobat pe Acasă
+Pe Acasă apare un card cu numărul plăților de aprobat și suma lor. Dacă o plată așteaptă de mai mult de 3 zile, cardul arată asta. Numărul de zile se schimbă din setări.
+### Setări → Plăți automate
+Aici alegi cardul principal, după numele din Wallet sau dintre cardurile văzute deja, și numărul de zile pentru atenționare. Tot aici vezi, adaugi, modifici și ștergi regulile. Regulile de început acoperă lanțuri mari de magazine, farmacii și transport. Nu contează literele mari, spațiile sau diacriticele. Butonul de plată de test pune o plată de 1 leu în De aprobat, ca să încerci lista.
+Primirea de la oraș funcționează după ce actualizezi și orașul. Până atunci aplicația nu se schimbă. Backup-urile vechi primesc singure regulile de început și o listă goală.
+
 ## 1.12.1 · 27 noiembrie 2026
 ### Mesajul corect la bancnote
 În Pușculiță, după ce adaugi sau scoți bancnote, mesajul de sus scria de exemplu „+1 20 lei”, care se citea ca 120 lei, indiferent câte bancnote puneai. Acum arată câte bucăți, valoarea și câte ai în total, de exemplu „Pus deoparte 5 × 20 lei = 100 lei · ai 12 buc.”. Mesajul e la fel la butoanele + și − și la Adaugă mai multe. La euro arată suma în euro. Datele din pușculiță nu se schimbă.

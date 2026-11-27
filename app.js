@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const FC = window.FC;
-  const APP_VERSION = '1.12.1';            // aceeași cu VERSION din sw.js (verificat de teste)
+  const APP_VERSION = '1.13.0';            // aceeași cu VERSION din sw.js (verificat de teste)
   const APP_DATE = '27 noiembrie 2026';
   const KEY = 'fonduri.data.v1';
   const $app = document.getElementById('app');
@@ -148,6 +148,7 @@
     inc: '<path d="M17 7 7 17M7 9v8h8"/>',
     out: '<path d="M7 7l10 10M17 9v8H9"/>',
     swap: '<path d="M4 8h14l-4-4M20 16H6l4 4"/>',
+    card: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18M7 15h4"/>',
     receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
     bag: '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
     gift: '<path d="M4 10h16v10H4z"/><path d="M3 7h18v3H3zM12 7v13"/><path d="M12 7c-2-3-5-3-5-1s3 1 5 1c2 0 5 1 5-1s-3-2-5 1"/>',
@@ -242,7 +243,7 @@
   /* ================= rânduri de tranzacții ================= */
   function txVisual(t) {
     if (t.kind === 'income') return { c: '#6FCF97', icon: 'inc', title: t.sub, sub: t.eur ? fmt(t.eur) + ' € · împărțit în fonduri' : 'Împărțit în fonduri' };
-    if (t.kind === 'expense') return { c: '#FF6961', icon: t.src === 'recurring' ? 'repeat' : 'cart', title: t.note || t.cat || 'Cheltuială', sub: t.note ? (t.cat || '') : 'Din ' + (t.fund || EXP()) };
+    if (t.kind === 'expense') return { c: '#FF6961', icon: t.src === 'recurring' ? 'repeat' : t.src === 'wallet' ? 'card' : 'cart', title: t.note || t.cat || 'Cheltuială', sub: t.note ? (t.cat || '') : 'Din ' + (t.fund || EXP()) };
     if (t.kind === 'fund') return { c: fcol(t.fund), icon: 'bag', title: t.note || ('Din ' + t.fund), sub: 'Din ' + t.fund + (t.cat ? ', ' + t.cat : '') };
     if (t.kind === 'transfer') return { c: '#4B9CD3', icon: 'swap', title: t.fund + ' → ' + t.to, sub: t.note || 'Mutare între fonduri' };
     if (t.kind === 'invest') return { c: '#9C8CF0', icon: 'invest', title: t.note || 'Investit', sub: 'Din ' + t.fund };
@@ -293,7 +294,7 @@
       '<div class="row" style="gap:8px">' +
       '<button class="icon-btn" data-a="discreet" aria-label="' + (S.settings.discreet ? 'Arată sumele' : 'Ascunde sumele') + '">' + ic(S.settings.discreet ? 'eyeOff' : 'eye', 20) + '</button>' +
       '<button class="icon-btn" data-a="page" data-p="settings" aria-label="Setări">' + ic('gear', 20) + '</button></div></header>' +
-      (exportChip ? '<div class="row">' + exportChip + '</div>' : '') +
+      (exportChip ? '<div class="row">' + exportChip + '</div>' : '') + inboxCard() +
       (H.hero ? '<section class="hero">' +
       '<svg class="dial" aria-hidden="true" width="260" height="260" viewBox="0 0 260 260"><circle cx="130" cy="130" r="124" fill="none" stroke="rgba(255,255,255,.10)"/><circle cx="130" cy="130" r="96" fill="none" stroke="rgba(255,255,255,.10)"/><circle cx="130" cy="130" r="110" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="6" stroke-dasharray="1.5 9"/><circle cx="130" cy="130" r="68" fill="none" stroke="rgba(255,255,255,.08)"/></svg>' +
       '<span class="small" style="color:rgba(248,247,244,.78)">Bani disponibili' + (allF ? '' : ', ' + avail.length + ' fonduri') + '</span>' +
@@ -392,6 +393,40 @@
     const lei = FC.r2(k * d.value * (eur ? S.settings.eurRate : 1));
     const what = (n > 0 ? 'Pus deoparte ' : 'Scos ') + (eur ? qty(k) + ' €' : qty(k) + ' × ' + item.label + ' = ' + fmt(lei) + ' lei');
     return what + ' · ai ' + qty(after) + (eur ? ' €' : ' buc.');
+  }
+  /* Acasă: plățile din Wallet care așteaptă aprobarea */
+  function inboxCard() {
+    const n = S.inbox.length; if (!n) return '';
+    const late = FC.payOverdue(S), ron = S.inbox.filter((x) => x.cur === 'RON').reduce((x, i) => x + i.amount, 0);
+    return '<button class="card row between" data-a="sheet" data-s="inbox" style="text-align:left;width:100%;' + (late.length ? 'border-color:rgba(227,179,65,.45)' : '') + '"><span class="row" style="gap:10px"><span class="badge" style="background:rgba(227,179,65,.16);color:var(--amber)">' + ic('card', 20) + '</span>' +
+      '<span class="col" style="gap:2px"><span style="font-weight:600">' + n + (n === 1 ? ' plată de aprobat' : ' plăți de aprobat') + '</span><span class="small muted">' + (late.length ? (late.length === 1 ? 'Una așteaptă' : late.length + ' așteaptă') + ' de peste ' + S.settings.pay.warnDays + ' zile' : 'Din Apple Pay' + (ron ? ', ' + fmt(ron, 2) + ' lei' : '')) + '</span></span></span>' + ic('right', 18) + '</button>';
+  }
+  const PAY_WHY = { card: 'Alt card decât cel principal', new: 'Comerciant nou', manual: 'Regulă cu aprobare', cur: 'Plată în altă monedă' };
+  function inboxSheet() {
+    if (!S.inbox.length) return sheetWrap('De aprobat', '<span class="small muted" style="line-height:1.5">Nu mai ai nimic de aprobat. Plățile noi din Apple Pay apar aici când deschizi aplicația.</span>', { cancel: 'Închide' });
+    const funds = FUNDS(), cats = S.settings.categories;
+    const items = S.inbox.slice().reverse().map((it) => {
+      const head = '<div class="row between" style="gap:10px;align-items:flex-start"><div class="col" style="gap:2px;min-width:0"><span style="font-weight:600;overflow-wrap:anywhere">' + esc(it.merchant) + '</span><span class="small muted">' + esc(it.card || 'Card necunoscut') + ', ' + dateShort(it.date) + '</span><span class="tiny muted">' + PAY_WHY[it.why || 'new'] + '</span></div>' +
+        '<span class="m" style="font-weight:600;white-space:nowrap">' + fmt(it.amount, 2) + ' ' + (it.cur === 'RON' ? 'lei' : esc(it.cur)) + '</span></div>' +
+        (it.dup ? '<div class="warn">Ai deja o cheltuială de ' + fmt(it.amount, 2) + ' lei în aceeași zi. Poate ai trecut-o de mână.</div>' : '');
+      if (it.cur !== 'RON') return '<div class="card col" style="gap:10px">' + head + '<div class="grid2"><button class="btn primary" data-a="payCrypto" data-id="' + esc(it.id) + '">Depunere crypto</button><button class="btn danger" data-a="payDel" data-id="' + esc(it.id) + '">' + ic('trash', 16) + 'Șterge</button></div></div>';
+      return '<form class="card col" style="gap:10px" data-form="payOk"><input type="hidden" name="id" value="' + esc(it.id) + '">' + head +
+        '<div class="grid2"><div class="field"><label>Categorie</label><select class="input" name="cat">' + cats.map((c) => '<option ' + (c === (it.cat || 'Altele') ? 'selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></div>' +
+        '<div class="field"><label>Fond</label><select class="input" name="fund"><option value="">Alege…</option>' + funds.map((f) => '<option ' + (f === it.fund ? 'selected' : '') + '>' + esc(f) + '</option>').join('') + '</select></div></div>' +
+        '<label class="switch"><span class="small">Aprobă mereu acest comerciant' + (S.settings.pay.mainCard ? ' (pe ' + esc(S.settings.pay.mainCard) + ' intră singur)' : '') + '</span><input type="checkbox" name="remember"></label>' +
+        '<div class="grid2"><button class="btn primary" type="submit">Aprobă</button><button class="btn danger" type="button" data-a="payDel" data-id="' + esc(it.id) + '">' + ic('trash', 16) + 'Șterge</button></div></form>';
+    }).join('');
+    return sheetWrap('De aprobat', '<span class="small muted" style="line-height:1.5">' + S.inbox.length + ' din Apple Pay. Alegi categoria și fondul, apoi aprobi. Ce ștergi nu se mai trece nicăieri.</span>' + items, { cancel: 'Închide' });
+  }
+  function payRuleSheet() {
+    const r = S.settings.pay.rules.find((x) => x.id === UI.args.id) || { m: '', cat: 'Mâncare', fund: null, auto: true };
+    return formSheet(UI.args.id ? 'Regulă: ' + r.m : 'Regulă nouă',
+      field('Numele comerciantului conține', 'm', r.m, 'required autocapitalize="characters" placeholder="ex. LIDL"') +
+      '<div class="grid2"><div class="field"><label>Categorie</label><select class="input" name="cat">' + S.settings.categories.map((c) => '<option ' + (c === r.cat ? 'selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></div>' +
+      '<div class="field"><label>Fond</label><select class="input" name="fund"><option value="">' + esc(EXP()) + ' (implicit)</option>' + FUNDS().map((f) => '<option ' + (f === r.fund ? 'selected' : '') + '>' + esc(f) + '</option>').join('') + '</select></div></div>' +
+      '<label class="switch"><span>Intră direct, fără aprobare (doar pe cardul principal)</span><input type="checkbox" name="auto" ' + (r.auto ? 'checked' : '') + '></label>' +
+      '<span class="small muted" style="line-height:1.5">Nu contează literele mari, spațiile sau diacriticele: „MEGA IMAGE” prinde și „Mega Image” și „MEGAIMAGE 1150”.</span>' +
+      (UI.args.id ? '<button class="btn danger block" type="button" data-a="payRuleDel" data-id="' + esc(r.id) + '">' + ic('trash', 16) + 'Șterge regula</button>' : ''), 'Salvează', 'payRule');
   }
   function piggyCard(cash) {
     return '<section class="card col" style="gap:14px"><div class="row between"><div class="row" style="gap:10px"><span class="badge" style="background:rgba(227,179,65,.16);color:var(--amber)">' + ic('piggy', 20) + '</span><div class="col" style="gap:2px"><h2 style="font-size:17px">Pușculița</h2><span class="small muted">Bancnote și euro puși deoparte</span></div></div>' +
@@ -821,14 +856,14 @@
   /* ================= PAGINĂ: Setări ================= */
   /* Setările deschise dintr-un ecran arată întâi ce ține de ecranul acela, apoi restul. */
   const SET_CTX = {
-    home: { name: 'Acasă', ids: ['home', 'funds', 'priv', 'look', 'sc'] },
+    home: { name: 'Acasă', ids: ['home', 'pay', 'funds', 'priv', 'look', 'sc'] },
     funds: { name: 'Fonduri', ids: ['funds', 'inc', 'cash', 'rec', 'cat'] },
     report: { name: 'Raport', ids: ['cur', 'crypto', 'sav'] },
     crypto: { name: 'Crypto', ids: ['crypto', 'cur'] },
     earn: { name: 'Earn', ids: ['crypto', 'cur'] },
     savings: { name: 'Economii', ids: ['sav', 'cur'] },
     stats: { name: 'Statistici', ids: ['cat', 'month', 'inc'] },
-    history: { name: 'Istoric', ids: ['cat', 'funds', 'rec'] },
+    history: { name: 'Istoric', ids: ['cat', 'pay', 'funds', 'rec'] },
     cryptoHistory: { name: 'Istoric crypto', ids: ['crypto', 'cur'] }
   };
   function setContext() {
@@ -942,6 +977,15 @@
       '<label class="btn block" style="cursor:pointer">' + ic('upload', 18, 2) + 'Importă un fișier<input type="file" accept=".json,application/json" data-a2="import" hidden></label>' +
       '<button class="btn danger block" data-a="wipe">Șterge toate datele</button>';
 
+    const PY = s.pay;
+    const payBody = '<span class="small soft" style="line-height:1.5">Plățile cu Apple Pay vin prin oraș. Pe cardul principal, comercianții cu regulă intră direct. Restul (alt card, comerciant nou, altă monedă) așteaptă pe Acasă, la De aprobat.</span>' +
+      lbl('Cardul principal (numele din Wallet)', '<input class="input" value="' + esc(PY.mainCard) + '" data-a2="payMain" placeholder="ex. Visa 1234" autocomplete="off">') +
+      (PY.cards.length ? '<div class="row" style="gap:6px;flex-wrap:wrap">' + PY.cards.map((c) => '<button class="chip ' + (FC.payNorm(c) === FC.payNorm(PY.mainCard) ? 'on' : '') + '" data-a="payMainSet" data-v="' + esc(c) + '">' + ic('card', 14) + esc(c) + '</button>').join('') + '</div><span class="tiny muted">Cardurile văzute până acum. Atinge unul ca să-l faci principal.</span>' : '<span class="tiny muted">Cardurile apar aici după prima plată primită.</span>') +
+      lbl('Atenționare pe Acasă după (zile)', '<input class="input" inputmode="numeric" value="' + PY.warnDays + '" data-a2="payWarn">') +
+      '<h3>Reguli (' + PY.rules.length + ')</h3>' +
+      PY.rules.slice().sort((a, b) => a.m.localeCompare(b.m)).map((r) => '<button class="list-row" data-a="sheet" data-s="payRule" data-id="' + esc(r.id) + '" style="padding:6px 0"><span class="grow"><span class="t">' + esc(r.m) + '</span><span class="s">' + esc(r.cat) + ', ' + esc(r.fund || EXP()) + (r.auto ? '' : ', cu aprobare') + '</span></span>' + ic('right', 16) + '</button>').join('') +
+      '<button class="btn block" data-a="sheet" data-s="payRule">' + ic('plus', 18, 2) + 'Adaugă regulă</button>' +
+      '<button class="btn block" data-a="payTest">Trimite o plată de test în De aprobat</button>';
     const ctx = SET_CTX[UI.setCtx] || null;
     const all = [
       grp('prof', 'Profil', [s.name, P.pet, P.bank, P.exchange].filter(Boolean).map(esc).join(', ') || 'nume, animal, bancă, exchange', profBody),
@@ -953,6 +997,7 @@
       grp('crypto', 'Crypto și ' + esc(EXCH()), 'prețuri live, fee-uri', cryptoBody),
       grp('sav', 'Economii', esc(s.savings.name), savBody),
       grp('rec', 'Plăți recurente', S.recurring.length + ' plăți', recBody),
+      grp('pay', 'Plăți automate', (s.pay.mainCard ? esc(s.pay.mainCard) + ', ' : 'card principal nesetat, ') + s.pay.rules.length + ' reguli', payBody),
       grp('sc', 'Scurtături', S.shortcuts.length + ' salvate', scBody),
       grp('home', 'Ecranul Acasă', 'bani disponibili, secțiuni', homeBody),
       grp('look', 'Aspect', (THEMES[th.accent] || THEMES.mov).name + ', ' + (BGS[th.bg] || BGS.denim).name + ', text ' + (SIZES[th.size] || SIZES.normal)[0].toLowerCase(), lookBody),
@@ -1261,6 +1306,8 @@
         '<input type="hidden" name="id" value="' + esc(e.id) + '">', 'Salvează', 'savInt');
     }
     if (s === 'savCalc') return savCalcSheet();
+    if (s === 'inbox') return inboxSheet();
+    if (s === 'payRule') return payRuleSheet();
     if (s === 'savSet') return formSheet('Soldul real din cont', field('Sold acum (lei)', 'amount', FC.savingsBalance(S) || '', 'inputmode="decimal" required') + '<span class="small muted" style="line-height:1.5">Pui cifra din aplicația băncii. Nu mută bani din fonduri, doar corectează soldul.</span>', 'Salvează', 'savSet');
     if (s === 'cashAdd') return formSheet('Pușculița', '<div class="field"><label for="f_d">Ce pui</label><select id="f_d" class="input" name="denom">' + S.settings.denoms.map((d) => '<option value="' + d.id + '">' + d.label + '</option>').join('') + '</select></div>' +
       '<div class="grid2">' + field('Câte (sau câți €)', 'count', '', 'inputmode="decimal" required') + '<div class="field"><label for="f_dir">Operație</label><select id="f_dir" class="input" name="dir"><option value="1">Pun deoparte</option><option value="-1">Scot</option></select></div></div>' +
@@ -1409,7 +1456,20 @@
       (localStorage.getItem('fonduri.receiver.v1') ? '<button class="btn" data-a="forgetCity">Uit cheia acestui PC</button>' : '') + '</details>';
   }
   var citySoonT;
-  function citySync(force) { if (window.citySyncAuto && (unlocked || !S.settings.lock.enabled)) return window.citySyncAuto(force); return Promise.resolve({ ok: false, skip: true }); }
+  function citySync(force) { if (window.citySyncAuto && (unlocked || !S.settings.lock.enabled)) return window.citySyncAuto(force).then((r) => { cityPull(); return r; }); return Promise.resolve({ ok: false, skip: true }); }
+  /* plățile din Apple Pay, păstrate de oraș până le iau: le pun în tranzacții sau în De aprobat, apoi confirm primirea */
+  let pulling = false;
+  async function cityPull() {
+    if (!window.cityInbox || pulling) return; pulling = true;
+    try {
+      const r = await window.cityInbox([]); if (!r || !r.ok || !Array.isArray(r.items) || !r.items.length) return;
+      const res = FC.payIngest(S, r.items); commit();
+      await window.cityInbox(r.items.map((x) => String(x.id || '')).filter(Boolean)).catch(() => {});
+      const a = res.auto.length, p = res.pending.length;
+      if (a || p) toast([a ? a + (a === 1 ? ' plată trecută' : ' plăți trecute') : '', p ? p + ' de aprobat' : ''].filter(Boolean).join(', '));
+      render();
+    } catch (e) { /* orașul nu răspunde: încerc la următoarea deschidere */ } finally { pulling = false; }
+  }
   function citySoon() { clearTimeout(citySoonT); citySoonT = setTimeout(() => citySync(false), 60000); }
 
   const actions = {
@@ -1535,6 +1595,11 @@
     earnStop: (d) => { const e = S.earn.find((x) => x.id === d.id); if (e) ask('Ai scos ' + e.coin + ' din Earn? Recompensele deja confirmate rămân în portofoliu. Confirmă întâi încasările reale; estimările nu se încasează automat.', 'Da, l-am scos', () => { FC.earnStop(S, d.id); closeSheet(); commit('Scos din Earn'); }); },
     savDel: (d) => ask('Ștergi operațiunea?', 'Șterge', () => { const tx = S.tx.find((t) => t.link === d.id); if (tx) FC.deleteTx(S, tx.id); else S.savings = S.savings.filter((e) => e.id !== d.id); commit('Șters'); render(); }),
     formSet: (d) => { UI.form[d.k] = d.v; lastSheetName = null; render(); },
+    payDel: (d) => { const it = S.inbox.find((x) => x.id === d.id); if (!it) return; ask('Ștergi plata de ' + fmt(it.amount, 2) + ' ' + (it.cur === 'RON' ? 'lei' : it.cur) + ' la ' + it.merchant + '? Nu se trece nicăieri.', 'Șterge', () => { FC.payDismiss(S, d.id); commit('Plată ștearsă'); if (!S.inbox.length) closeSheet(); else render(); }); },
+    payCrypto: (d) => { const it = S.inbox.find((x) => x.id === d.id); if (!it) return; openSheet('deposit', { usd: it.cur === 'USD' ? numIn(it.amount) : '', date: it.date, payInbox: it.id }); },
+    payRuleDel: (d) => ask('Ștergi regula? Plățile viitoare de la acest comerciant vor aștepta aprobarea.', 'Șterge', () => { S.settings.pay.rules = S.settings.pay.rules.filter((r) => r.id !== d.id); closeSheet(); commit('Regulă ștearsă'); }),
+    payMainSet: (d) => { S.settings.pay.mainCard = d.v; commit('Card principal: ' + d.v); render(); },
+    payTest: () => { FC.payIngest(S, [{ id: 'test-' + FC.uid(), merchant: 'Plată de test', card: S.settings.pay.mainCard || 'Card de test', amount: '1,00 RON' }]); commit('Plată de test adăugată în De aprobat'); render(); },
     calcSet: (d) => { UI.form[d.k] = d.v; UI.full = true; render(); },
     savCalc: () => { const s = S.settings.savings, b = Math.round(FC.savingsBalance(S) || 0); openSheet('savCalc', { mode: 'earn', rate: numIn(+(s.apr * 100).toFixed(4)), tax: numIn(+(s.tax * 100).toFixed(2)), amt: b ? String(b) : '500', start: b ? String(b) : '0', dep: '50', freq: 'm', n: '2', unit: 'y', gmode: 'income', want: '50', per: 'week', target: '5000', tview: 'y' }); },
     catDel: (d) => ask('Ștergi categoria „' + d.c + '”? Tranzacțiile vechi o păstrează.', 'Șterge', () => { S.settings.categories = S.settings.categories.filter((c) => c !== d.c); commit(); render(); }),
@@ -1571,7 +1636,7 @@
     deposit: (f) => {
       const p = { usd: num(f.usd), lei: num(f.lei), refRate: UI.form.ref, date: f.date.value };
       if (UI.args.edit) { FC.cryptoEditEvent(S, UI.args.edit, p); closeSheet(); commit('Depunere modificată'); return; }
-      FC.cryptoDeposit(S, p); closeSheet(); commit('Depunere salvată');
+      FC.cryptoDeposit(S, p); if (UI.args.payInbox) FC.payDismiss(S, UI.args.payInbox); closeSheet(); commit('Depunere salvată');
     },
     trade: (f) => {
       const side = UI.form.side || UI.args.side || 'buy';
@@ -1622,6 +1687,18 @@
     },
     savInt: (f) => { FC.setInterestReal(S, f.id.value, num(f.amount)); closeSheet(); commit('Dobândă salvată'); },
     savSet: (f) => { const v = num(f.amount); if (!(v >= 0)) throw new Error('Scrie soldul.'); S.savings.push({ id: FC.uid(), kind: 'set', date: FC.localISO(), amount: FC.r2(v), note: 'din aplicația băncii' }); closeSheet(); commit('Sold actualizat'); },
+    payOk: (f) => {
+      const t = FC.payApprove(S, f.id.value, { cat: f.cat.value, fund: f.fund.value, remember: f.remember.checked });
+      if (!S.inbox.length) closeSheet(); else render();
+      commit((f.remember.checked ? 'Aprobat și ținut minte: ' : 'Aprobat: ') + t.note + ', ' + fmt(t.amount, 2) + ' lei din ' + t.fund);
+    },
+    payRule: (f) => {
+      const m = f.m.value.trim(); if (!FC.payNorm(m)) throw new Error('Scrie numele comerciantului.');
+      const rules = S.settings.pay.rules, r = rules.find((x) => x.id === UI.args.id);
+      const o = { m: m.toUpperCase().slice(0, 40), cat: f.cat.value, fund: f.fund.value || null, auto: f.auto.checked };
+      if (r) Object.assign(r, o); else rules.push(Object.assign({ id: FC.uid() }, o));
+      closeSheet(); commit('Regulă salvată');
+    },
     cashAdd: (f) => {
       const n = num(f.count) * (+f.dir.value);
       if (!n) throw new Error('Scrie câte.');
@@ -1662,6 +1739,8 @@
     else if (k === 'bin') { if (v >= 0) s.binance[el.dataset.k] = v / 100; }
     else if (k === 'sav') { if (el.dataset.k === 'name') s.savings.name = el.value; else if (v >= 0) s.savings[el.dataset.k] = v / 100; }
     else if (k === 'name') s.name = el.value;
+    else if (k === 'payMain') s.pay.mainCard = el.value.trim().slice(0, 60);
+    else if (k === 'payWarn') { if (v >= 1 && v <= 30) s.pay.warnDays = Math.round(v); else return false; }
     else if (k === 'recentCount') { if (v >= 1 && v <= 30) s.home.recentCount = Math.round(v); }
     else if (k === 'lockAfterMin') { if (v >= 0) s.lockAfterMin = v; }
     else if (k === 'exportRemindDays') { if (v >= 1) s.exportRemindDays = Math.round(v); }

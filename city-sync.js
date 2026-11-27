@@ -150,4 +150,16 @@
     }catch(e){setCfg({lastErr:e.message});return {ok:false,msg:e.message};}
     finally{busy=false;}
   };
+  /* Plățile din Apple Pay (1.13.0): scurtătura de pe iPhone le trimite orașului, iar orașul le ține până le ia
+     Fonduri. Cererea e semnată cu aceeași cheie a telefonului; ack = id-urile deja salvate, pe care orașul le șterge.
+     Un oraș vechi, fără această funcție, răspunde cu eroare și nu se întâmplă nimic. */
+  window.cityInbox=async function(ack){
+    const c=cfg();if(!c.u||!c.id)return {ok:false,skip:true};
+    const key=await keyOp('get');if(!key||key.id!==c.id)return {ok:false,skip:true};
+    const ss=await call(c.u+'/api/fonduri/v2/sesiune?d='+encodeURIComponent(c.id),{},4000);if(!ss.ok)return {ok:false};
+    const a=JSON.stringify((Array.isArray(ack)?ack:[]).slice(0,200));
+    const sig=b64(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key.priv,enc(ss.n+'.plati.'+a)));
+    const r=await call(c.u+'/api/fonduri/v2/plati',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({d:c.id,s:ss.s,ack:a,sig})},6000);
+    return r&&r.ok?{ok:true,items:Array.isArray(r.items)?r.items.slice(0,200):[]}:{ok:false,msg:r&&r.msg};
+  };
 })();
