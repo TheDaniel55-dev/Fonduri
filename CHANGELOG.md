@@ -1,5 +1,9 @@
 # Change Log — Fonduri
 
+## 1.12.1 · 27 noiembrie 2026
+### Mesajul corect la bancnote
+În Pușculiță, după ce adaugi sau scoți bancnote, mesajul de sus scria de exemplu „+1 20 lei”, care se citea ca 120 lei, indiferent câte bancnote puneai. Acum arată câte bucăți, valoarea și câte ai în total, de exemplu „Pus deoparte 5 × 20 lei = 100 lei · ai 12 buc.”. Mesajul e la fel la butoanele + și − și la Adaugă mai multe. La euro arată suma în euro. Datele din pușculiță nu se schimbă.
+
 ## 1.12.0 · 23 noiembrie 2026
 ### Sincronizare automată cu orașul
 Fonduri trimite singur portofoliul către Orașul DSL, prin Tailscale, fără QR și fără confirmare. Trimiterea pornește când deschizi sau redeschizi aplicația, după deblocare, și la un minut după ce modifici ceva. Se trimite doar dacă s-a schimbat ceva, sau o dată pe zi. Dacă Tailscale e oprit sau PC-ul nu răspunde, aplicația nu te deranjează și încearcă la următoarea deschidere. În Setări → Orașul DSL vezi ultima sincronizare reușită, motivul ultimei încercări nereușite și butonul Trimite acum.

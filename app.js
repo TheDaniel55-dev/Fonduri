@@ -2,8 +2,8 @@
 (function () {
   'use strict';
   const FC = window.FC;
-  const APP_VERSION = '1.12.0';            // aceeași cu VERSION din sw.js (verificat de teste)
-  const APP_DATE = '23 noiembrie 2026';
+  const APP_VERSION = '1.12.1';            // aceeași cu VERSION din sw.js (verificat de teste)
+  const APP_DATE = '27 noiembrie 2026';
   const KEY = 'fonduri.data.v1';
   const $app = document.getElementById('app');
 
@@ -384,6 +384,14 @@
             : 'Din ' + esc(g.fund) + ', mai ai ' + fmt(Math.round(p.left)) + ' lei' + (by ? ', adică ' + fmt(Math.ceil(p.perMonth)) + ' lei pe lună până în ' + MONTHS[by.getMonth()] + ' ' + by.getFullYear() : '')) + '</span></button>';
       }).join('') : '<span class="small muted" style="line-height:1.5">De exemplu „Dronă nouă, 4.000 lei din Achiziție, până în iunie”. Aplicația îți arată cât ai strâns și cât trebuie să pui pe lună.</span>') +
       (done.length ? '<span class="tiny muted">Atinse: ' + done.map((g) => esc(g.name)).join(', ') + '</span>' : '') + '</section>';
+  }
+  /* mesajul după o mișcare în pușculiță: „+5 × 20 lei = 100 lei · ai 12 buc.” (nu „+5 20 lei”, care se citea ca 520 lei) */
+  function cashMsg(item, n) {
+    const d = (S.settings.denoms || []).find((x) => x.id === item.id) || { value: 0, cur: item.cur };
+    const after = FC.r2(item.count + n), eur = item.cur === 'EUR', k = Math.abs(n);
+    const lei = FC.r2(k * d.value * (eur ? S.settings.eurRate : 1));
+    const what = (n > 0 ? 'Pus deoparte ' : 'Scos ') + (eur ? qty(k) + ' €' : qty(k) + ' × ' + item.label + ' = ' + fmt(lei) + ' lei');
+    return what + ' · ai ' + qty(after) + (eur ? ' €' : ' buc.');
   }
   function piggyCard(cash) {
     return '<section class="card col" style="gap:14px"><div class="row between"><div class="row" style="gap:10px"><span class="badge" style="background:rgba(227,179,65,.16);color:var(--amber)">' + ic('piggy', 20) + '</span><div class="col" style="gap:2px"><h2 style="font-size:17px">Pușculița</h2><span class="small muted">Bancnote și euro puși deoparte</span></div></div>' +
@@ -1520,7 +1528,7 @@
     cash: guard((d) => {
       const n = +d.n, item = FC.cashSummary(S).items.find((i) => i.id === d.d);
       if (n < 0 && item.count < 1) throw new Error('Nu mai ai ' + item.label + ' în pușculiță.');
-      FC.addCash(S, d.d, n); commit((n > 0 ? '+1 ' : '−1 ') + item.label);
+      FC.addCash(S, d.d, n); commit(cashMsg(item, n));
       render();
     }),
     classifyReward: (d) => ask('Schimbi clasificarea acestei diferențe? Cantitatea din portofoliu rămâne aceeași; se schimbă numai raportarea ca venit.', 'Confirmă', () => { FC.classifyReward(S, d.id, d.kind); commit('Clasificare salvată'); render(); }),
@@ -1619,7 +1627,7 @@
       if (!n) throw new Error('Scrie câte.');
       const it = FC.cashSummary(S).items.find((i) => i.id === f.denom.value);
       if (n < 0 && it.count + n < -1e-9) throw new Error('Ai doar ' + it.count + '.');
-      FC.addCash(S, f.denom.value, n); closeSheet(); commit('Pușculița actualizată');
+      FC.addCash(S, f.denom.value, n); closeSheet(); commit(cashMsg(it, n));
     },
     eurExchange: (f) => { const r = FC.exchangeEur(S, num(f.eur), num(f.lei)); closeSheet(); commit(r.diff > 0 ? '+' + fmt(r.diff, 2) + ' lei la ' + S.settings.eurGainType : r.diff < 0 ? 'Pierdere ' + fmt(-r.diff, 2) + ' lei' : 'Schimb salvat'); },
     goalEdit: (f) => {
