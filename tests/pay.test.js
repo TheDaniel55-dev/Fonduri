@@ -68,3 +68,13 @@ test('Fără card trimis: comerciantul cu regulă intră direct, cel nou așteap
   const r = FC.payIngest(s, [{ id: 'w-000009', merchant: 'Lidl', amount: '12 RON' }, { id: 'w-000010', merchant: 'Ceva Nou', amount: '7 RON' }]);
   assert.strictEqual(r.auto.length, 1); assert.strictEqual(s.inbox.length, 1); assert.strictEqual(s.inbox[0].why, 'new');
 });
+
+test('fără card principal ales, regulile se aplică și când vine numele cardului', () => {
+  const s = FC.emptyState();
+  const r = FC.payIngest(s, [{ id: 'w-nomain0001', merchant: 'LIDL SIBIU', amount: 'RON 45.20', card: 'BT Visa' }]);
+  assert.strictEqual(r.auto.length, 1);
+  s.settings.pay.mainCard = 'BT';
+  const r2 = FC.payIngest(s, [{ id: 'w-nomain0002', merchant: 'LIDL SIBIU', amount: '10,00 RON', card: 'Revolut' }]);
+  assert.strictEqual(r2.pending.length, 1);
+  assert.strictEqual(r2.pending[0].why, 'card');
+});

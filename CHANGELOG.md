@@ -1,5 +1,9 @@
 # Change Log — Fonduri
 
+## 1.13.2 · 28 noiembrie 2026
+### Regulile merg până alegi cardul principal
+Cât timp în Setări → Plăți automate nu este ales cardul principal, o plată la un comerciant cu regulă de intrare directă intră direct în tranzacții, chiar dacă scurtătura trimite numele cardului. După ce alegi cardul principal, intră direct doar plățile făcute cu el, iar celelalte carduri așteaptă în De aprobat.
+
 ## 1.13.1 · 27 noiembrie 2026
 ### Regulile merg și când nu se știe cardul
 Când scurtătura de pe iPhone nu trimite numele cardului, o plată la un comerciant cu regulă de intrare directă, de exemplu Lidl sau Kaufland, intră direct în tranzacții, cu categoria și fondul regulii. Comercianții noi și plățile în altă monedă așteaptă în continuare în De aprobat. Când cardul este trimis, regula rămâne cea de dinainte: intră direct doar plățile cu cardul principal.
